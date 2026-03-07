@@ -1,0 +1,236 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkItemType {
+  outcome
+  kpi
+  capability
+  feature
+  story
+  task
+  bug
+  research
+  incident
+  decision
+}
+
+enum WorkItemStatus {
+  new
+  ready
+  in_progress
+  blocked
+  done
+  cancelled
+}
+
+enum RelationshipType {
+  supports
+  relates_to
+  blocks
+  depends_on
+  informs
+  impacts
+}
+
+enum SignalType {
+  kpi_change
+  customer_feedback
+  incident_alert
+  delivery_risk
+  test_failure
+  deployment_event
+  usage_pattern
+  anomaly
+  dependency_change
+  external_change
+}
+
+enum SignalStatus {
+  new
+  triaged
+  actioned
+  ignored
+  resolved
+}
+
+enum UserType {
+  member
+  manager
+  admin
+  system
+}
+
+model Product {
+  id          String @id @default(uuid())
+  name        String @unique
+  slug        String @unique
+  description String?
+  definition_of_done String?
+
+  work_items     WorkItem[]
+  pages          Page[]
+  comments       Comment[]
+  signals        Signal[]
+  relationships  Relationship[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("products")
+}
+
+model WorkItem {
+  id          String         @id @default(uuid())
+  title       String
+  description String?
+  acceptance_criteria String?
+  type        WorkItemType
+  status      WorkItemStatus @default(new)
+  current_value Float?
+  target_value  Float?
+  unit          String?
+  last_updated_at DateTime?
+  parent_id   String?
+  product_id  String
+  created_by  String?
+  assignee_id String?
+
+  parent   WorkItem?  @relation("WorkItemTree", fields: [parent_id], references: [id], onDelete: SetNull)
+  children WorkItem[] @relation("WorkItemTree")
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  creator  User? @relation("WorkItemCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  assignee User? @relation("WorkItemAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
+
+  pages    Page[]
+  comments Comment[]
+  signals  Signal[]
+
+  outgoing_relationships Relationship[] @relation("FromWorkItem")
+  incoming_relationships Relationship[] @relation("ToWorkItem")
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([parent_id])
+  @@index([product_id])
+  @@map("work_items")
+}
+
+model Relationship {
+  id                String           @id @default(uuid())
+  product_id        String
+  from_work_item_id String
+  to_work_item_id   String
+  relationship_type RelationshipType
+
+  product        Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  from_work_item WorkItem @relation("FromWorkItem", fields: [from_work_item_id], references: [id], onDelete: Cascade)
+  to_work_item   WorkItem @relation("ToWorkItem", fields: [to_work_item_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([product_id])
+  @@index([from_work_item_id])
+  @@index([to_work_item_id])
+  @@unique([product_id, from_work_item_id, to_work_item_id, relationship_type])
+  @@map("relationships")
+}
+
+model Page {
+  id           String @id @default(uuid())
+  title        String
+  body         String?
+  product_id   String
+  work_item_id String?
+  author_id    String?
+
+  product   Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  work_item WorkItem? @relation(fields: [work_item_id], references: [id], onDelete: SetNull)
+  author    User?     @relation(fields: [author_id], references: [id], onDelete: SetNull)
+
+  comments Comment[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([product_id])
+  @@index([work_item_id])
+  @@map("pages")
+}
+
+model Comment {
+  id           String @id @default(uuid())
+  body         String
+  product_id   String
+  work_item_id String?
+  page_id      String?
+  author_id    String?
+
+  product   Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  work_item WorkItem? @relation(fields: [work_item_id], references: [id], onDelete: SetNull)
+  page      Page?     @relation(fields: [page_id], references: [id], onDelete: SetNull)
+  author    User?     @relation(fields: [author_id], references: [id], onDelete: SetNull)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([product_id])
+  @@index([work_item_id])
+  @@index([page_id])
+  @@map("comments")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  user_type UserType @default(member)
+
+  created_work_items  WorkItem[] @relation("WorkItemCreator")
+  assigned_work_items WorkItem[] @relation("WorkItemAssignee")
+  pages               Page[]
+  comments            Comment[]
+  signals             Signal[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Signal {
+  id                String       @id @default(uuid())
+  title             String
+  description       String?
+  signal_type       SignalType
+  status            SignalStatus @default(new)
+  severity          String?
+  payload           Json?
+  created_follow_up Boolean      @default(false)
+  routing_note      String?
+  product_id        String
+  work_item_id      String?
+  reporter_id       String?
+
+  product   Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  work_item WorkItem? @relation(fields: [work_item_id], references: [id], onDelete: SetNull)
+  reporter  User?     @relation(fields: [reporter_id], references: [id], onDelete: SetNull)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([product_id])
+  @@index([work_item_id])
+  @@map("signals")
+}
