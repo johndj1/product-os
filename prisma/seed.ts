@@ -626,6 +626,119 @@ async function seedCheckATrain(systemUserId: string) {
     createdBy: systemUserId,
   });
 
+  const providerFailureHandlingAndServiceResilience = await createWorkItem({
+    title: "Provider failure handling and service resilience",
+    type: WorkItemType.feature,
+    status: WorkItemStatus.in_progress,
+    description:
+      "Handle Darwin provider failures in a way that preserves user trust, keeps failure signals observable, and only escalates into investigation work when failures become repeated enough to matter.",
+    acceptanceCriteria:
+      "- A single provider failure is observable without creating immediate backlog noise\n- Live-data lookup failures show a graceful retry path to the user\n- Structured provider failure signals can be traced in Product OS\n- Repeated provider failures can be escalated into investigation work using a defined threshold",
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const detectAndClassifyProviderCallFailures = await createWorkItem({
+    title: "Detect and classify provider call failures",
+    type: WorkItemType.story,
+    status: WorkItemStatus.in_progress,
+    parentId: providerFailureHandlingAndServiceResilience.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const presentGracefulRetryMessaging = await createWorkItem({
+    title: "Present graceful retry messaging to users",
+    type: WorkItemType.story,
+    status: WorkItemStatus.ready,
+    parentId: providerFailureHandlingAndServiceResilience.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const emitProviderFailureSignals = await createWorkItem({
+    title: "Emit provider failure signals to Product OS",
+    type: WorkItemType.story,
+    status: WorkItemStatus.ready,
+    parentId: providerFailureHandlingAndServiceResilience.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const escalateRepeatedProviderFailures = await createWorkItem({
+    title: "Escalate repeated provider failures into investigation work",
+    type: WorkItemType.story,
+    status: WorkItemStatus.ready,
+    parentId: providerFailureHandlingAndServiceResilience.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const classifyDarwinFailureTypesAndSeverity = await createWorkItem({
+    title: "Classify Darwin failure types and severity",
+    type: WorkItemType.task,
+    status: WorkItemStatus.in_progress,
+    description:
+      "Differentiate retryable upstream timeouts, unavailable services, malformed payloads, and partial-data responses so Check-a-Train can react proportionately.",
+    parentId: detectAndClassifyProviderCallFailures.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const addUserFacingRetryErrorState = await createWorkItem({
+    title: "Add user-facing retry/error state for live data failures",
+    type: WorkItemType.task,
+    status: WorkItemStatus.ready,
+    description:
+      "Show a clear retry path when live running data cannot be fetched, while avoiding misleading eligibility claims when provider confidence is low.",
+    parentId: presentGracefulRetryMessaging.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const emitDarwinApiErrorSignal = await createWorkItem({
+    title: "Emit darwin_api_error with structured metadata",
+    type: WorkItemType.task,
+    status: WorkItemStatus.ready,
+    description:
+      "Capture provider, failure class, retryability, endpoint context, and rolling counts so repeated Darwin failures can be reviewed in Product OS.",
+    parentId: emitProviderFailureSignals.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const defineRepeatedProviderFailureThreshold = await createWorkItem({
+    title: "Define threshold for repeated provider failure escalation",
+    type: WorkItemType.task,
+    status: WorkItemStatus.ready,
+    description:
+      "Set a practical threshold for investigation work so isolated provider failures remain visible as Signals, while repeated failures create actionable operating work.",
+    parentId: escalateRepeatedProviderFailures.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const createInvestigationWorkItemOnThresholdExceeded = await createWorkItem({
+    title: "Create or link investigation WorkItem when failure threshold is exceeded",
+    type: WorkItemType.task,
+    status: WorkItemStatus.ready,
+    description:
+      "When repeated provider failures cross the agreed threshold, route the issue into a single investigation WorkItem rather than generating new backlog for each failing call.",
+    parentId: escalateRepeatedProviderFailures.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const investigateRepeatedDarwinFailures = await createWorkItem({
+    title: "Investigate repeated Darwin provider failures",
+    type: WorkItemType.research,
+    status: WorkItemStatus.ready,
+    description:
+      "Review repeated darwin_api_error patterns, confirm whether the issue is upstream or in request handling, and decide whether resilience or messaging changes should be prioritised.",
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
   const documentationFeature = await createWorkItem({
     title: "Product documentation and enablement",
     type: WorkItemType.feature,
@@ -737,6 +850,18 @@ async function seedCheckATrain(systemUserId: string) {
       },
       {
         product_id: product.id,
+        from_work_item_id: providerFailureHandlingAndServiceResilience.id,
+        to_work_item_id: delayDetectionAccuracyKpi.id,
+        relationship_type: RelationshipType.impacts,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: providerFailureHandlingAndServiceResilience.id,
+        to_work_item_id: timeToClaimStartKpi.id,
+        relationship_type: RelationshipType.impacts,
+      },
+      {
+        product_id: product.id,
         from_work_item_id: operatorClaimHandoff.id,
         to_work_item_id: claimConversionRateKpi.id,
         relationship_type: RelationshipType.impacts,
@@ -755,6 +880,12 @@ async function seedCheckATrain(systemUserId: string) {
       },
       {
         product_id: product.id,
+        from_work_item_id: providerFailureHandlingAndServiceResilience.id,
+        to_work_item_id: darwinIntegrationAndProcessing.id,
+        relationship_type: RelationshipType.supports,
+      },
+      {
+        product_id: product.id,
         from_work_item_id: defineDarwinRequestResponseHandling.id,
         to_work_item_id: darwinHspIntegration.id,
         relationship_type: RelationshipType.supports,
@@ -769,6 +900,36 @@ async function seedCheckATrain(systemUserId: string) {
         product_id: product.id,
         from_work_item_id: handleDarwinApiFailureCases.id,
         to_work_item_id: operatorClaimHandoff.id,
+        relationship_type: RelationshipType.informs,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: classifyDarwinFailureTypesAndSeverity.id,
+        to_work_item_id: handleDarwinApiFailureCases.id,
+        relationship_type: RelationshipType.supports,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: addUserFacingRetryErrorState.id,
+        to_work_item_id: operatorClaimHandoff.id,
+        relationship_type: RelationshipType.supports,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: emitDarwinApiErrorSignal.id,
+        to_work_item_id: investigateRepeatedDarwinFailures.id,
+        relationship_type: RelationshipType.supports,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: defineRepeatedProviderFailureThreshold.id,
+        to_work_item_id: investigateRepeatedDarwinFailures.id,
+        relationship_type: RelationshipType.informs,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: investigateRepeatedDarwinFailures.id,
+        to_work_item_id: providerFailureHandlingAndServiceResilience.id,
         relationship_type: RelationshipType.informs,
       },
       {
@@ -863,6 +1024,26 @@ async function seedCheckATrain(systemUserId: string) {
     },
   });
 
+  const providerResilienceNotesPage = await prisma.page.create({
+    data: {
+      title: "Check-a-Train provider resilience notes",
+      body: "Provider failures should be observable in Product OS, handled gracefully in the user journey, and escalated into investigation only when repeated enough to indicate a meaningful operating problem.",
+      product_id: product.id,
+      work_item_id: providerFailureHandlingAndServiceResilience.id,
+      author_id: systemUserId,
+    },
+  });
+
+  const failureHandlingGuidancePage = await prisma.page.create({
+    data: {
+      title: "Check-a-Train failure handling and retry guidance",
+      body: "When live running data is unavailable, Check-a-Train should explain that live data could not be confirmed, offer an immediate retry, and avoid overstating eligibility until provider confidence returns.",
+      product_id: product.id,
+      work_item_id: addUserFacingRetryErrorState.id,
+      author_id: systemUserId,
+    },
+  });
+
   const kpiMovementSignal = await prisma.signal.create({
     data: {
       title: "Claim start latency remains above the MVP threshold",
@@ -878,6 +1059,32 @@ async function seedCheckATrain(systemUserId: string) {
       work_item_id: operatorClaimHandoff.id,
       reporter_id: systemUserId,
       routing_note: "Review handoff clarity and service detail before expanding scope.",
+    },
+  });
+
+  const darwinApiErrorSignal = await prisma.signal.create({
+    data: {
+      title: "darwin_api_error threshold exceeded for live running lookups",
+      description:
+        "Repeated Darwin lookup failures crossed the agreed threshold in the current operating window, so the issue should be investigated as a single resilience problem rather than as isolated failures.",
+      signal_type: SignalType.anomaly,
+      status: SignalStatus.triaged,
+      severity: "high",
+      payload: {
+        event_name: "darwin_api_error",
+        provider: "Darwin",
+        failure_class: "upstream_timeout",
+        retryable: true,
+        endpoint: "service_details_lookup",
+        failures_in_window: 7,
+        threshold: 5,
+        rolling_window_minutes: 15,
+      },
+      product_id: product.id,
+      work_item_id: investigateRepeatedDarwinFailures.id,
+      reporter_id: systemUserId,
+      routing_note:
+        "Single failures remain observable as Signals; repeated failures above threshold should link to one investigation WorkItem.",
     },
   });
 
@@ -921,6 +1128,22 @@ async function seedCheckATrain(systemUserId: string) {
         from_entity_id: darwinIntegrationAndProcessing.id,
         to_entity_type: EntityType.work_item,
         to_entity_id: delayDetectionAccuracyKpi.id,
+        relationship_type: EntityLinkType.impacts,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.work_item,
+        from_entity_id: providerFailureHandlingAndServiceResilience.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: delayDetectionAccuracyKpi.id,
+        relationship_type: EntityLinkType.impacts,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.work_item,
+        from_entity_id: providerFailureHandlingAndServiceResilience.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: timeToClaimStartKpi.id,
         relationship_type: EntityLinkType.impacts,
       },
       {
@@ -997,6 +1220,22 @@ async function seedCheckATrain(systemUserId: string) {
       },
       {
         product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: providerResilienceNotesPage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: providerFailureHandlingAndServiceResilience.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: failureHandlingGuidancePage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: addUserFacingRetryErrorState.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
         from_entity_type: EntityType.signal,
         from_entity_id: kpiMovementSignal.id,
         to_entity_type: EntityType.work_item,
@@ -1010,6 +1249,30 @@ async function seedCheckATrain(systemUserId: string) {
         to_entity_type: EntityType.work_item,
         to_entity_id: operatorClaimHandoff.id,
         relationship_type: EntityLinkType.triggered_by,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.signal,
+        from_entity_id: darwinApiErrorSignal.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: investigateRepeatedDarwinFailures.id,
+        relationship_type: EntityLinkType.triggered_by,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.signal,
+        from_entity_id: darwinApiErrorSignal.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: delayDetectionAccuracyKpi.id,
+        relationship_type: EntityLinkType.impacts,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.work_item,
+        from_entity_id: createInvestigationWorkItemOnThresholdExceeded.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: investigateRepeatedDarwinFailures.id,
+        relationship_type: EntityLinkType.creates,
       },
     ],
   });
