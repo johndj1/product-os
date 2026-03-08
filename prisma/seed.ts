@@ -147,6 +147,73 @@ async function seedProductOS(systemUserId: string) {
     createdBy: systemUserId,
   });
 
+  const documentationFeature = await createWorkItem({
+    title: "Documentation and enablement",
+    type: WorkItemType.feature,
+    status: WorkItemStatus.ready,
+    description: "Keep Product OS usable as the working system for seeded products by maintaining practical how-to, glossary, and operating documentation.",
+    parentId: workspaceCapability.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const productHowToGuides = await createWorkItem({
+    title: "Create product how-to guides",
+    type: WorkItemType.story,
+    status: WorkItemStatus.ready,
+    parentId: documentationFeature.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const productGlossary = await createWorkItem({
+    title: "Define glossary of product and domain terms",
+    type: WorkItemType.story,
+    status: WorkItemStatus.ready,
+    parentId: documentationFeature.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const architectureAndOperatingNotes = await createWorkItem({
+    title: "Create architecture and operating notes",
+    type: WorkItemType.story,
+    status: WorkItemStatus.ready,
+    parentId: documentationFeature.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const addProductOsHowToContent = await createWorkItem({
+    title: "Add how-to content for using Product OS",
+    type: WorkItemType.task,
+    status: WorkItemStatus.ready,
+    description: "Document the minimum workflow for reviewing a Product, checking KPIs, and updating WorkItems in the seeded workspace.",
+    parentId: productHowToGuides.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const addProductOsGlossaryEntries = await createWorkItem({
+    title: "Add glossary entries for Product OS concepts",
+    type: WorkItemType.task,
+    status: WorkItemStatus.ready,
+    description: "Capture the canonical meaning of Product, WorkItem, Relationship, Signal, KPI, Decision, and EntityLink for day-to-day usage.",
+    parentId: productGlossary.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const addProductOsOperatingNotes = await createWorkItem({
+    title: "Add Product OS operating notes for seeded products",
+    type: WorkItemType.task,
+    status: WorkItemStatus.ready,
+    description: "Explain how Product OS should be used to manage live seeded products without importing a large historical backlog.",
+    parentId: architectureAndOperatingNotes.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
   const createOverviewStory = await createWorkItem({
     title: "Create Product overview page",
     type: WorkItemType.story,
@@ -229,6 +296,18 @@ async function seedProductOS(systemUserId: string) {
       },
       {
         product_id: product.id,
+        from_work_item_id: documentationFeature.id,
+        to_work_item_id: workspaceShellFeature.id,
+        relationship_type: RelationshipType.supports,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: addProductOsOperatingNotes.id,
+        to_work_item_id: signalIngestionFeature.id,
+        relationship_type: RelationshipType.informs,
+      },
+      {
+        product_id: product.id,
         from_work_item_id: signalResearch.id,
         to_work_item_id: signalIngestionFeature.id,
         relationship_type: RelationshipType.informs,
@@ -248,6 +327,36 @@ async function seedProductOS(systemUserId: string) {
       body: "Initial workspace notes for Product OS.",
       product_id: product.id,
       work_item_id: workspaceShellFeature.id,
+      author_id: systemUserId,
+    },
+  });
+
+  const operatorGuidePage = await prisma.page.create({
+    data: {
+      title: "Product OS operator guide",
+      body: "How to use Product OS to review a Product, inspect WorkItems, trace Relationships, and maintain the graph as current operating context.",
+      product_id: product.id,
+      work_item_id: addProductOsHowToContent.id,
+      author_id: systemUserId,
+    },
+  });
+
+  const conceptGlossaryPage = await prisma.page.create({
+    data: {
+      title: "Product OS concept glossary",
+      body: "Working definitions for Product, WorkItem, Relationship, Signal, KPI, Decision, and EntityLink used throughout the seeded workspace.",
+      product_id: product.id,
+      work_item_id: addProductOsGlossaryEntries.id,
+      author_id: systemUserId,
+    },
+  });
+
+  const operatingNotesPage = await prisma.page.create({
+    data: {
+      title: "Product OS operating notes",
+      body: "Practical notes for running Product OS with seeded pilot products, including what stays in the graph versus what stays outside the MVP.",
+      product_id: product.id,
+      work_item_id: addProductOsOperatingNotes.id,
       author_id: systemUserId,
     },
   });
@@ -301,6 +410,30 @@ async function seedProductOS(systemUserId: string) {
         from_entity_id: overviewPage.id,
         to_entity_type: EntityType.work_item,
         to_entity_id: workspaceShellFeature.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: operatorGuidePage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: addProductOsHowToContent.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: conceptGlossaryPage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: addProductOsGlossaryEntries.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: operatingNotesPage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: addProductOsOperatingNotes.id,
         relationship_type: EntityLinkType.documents,
       },
       {
@@ -407,11 +540,60 @@ async function seedCheckATrain(systemUserId: string) {
     createdBy: systemUserId,
   });
 
+  const darwinIntegrationAndProcessing = await createWorkItem({
+    title: "Darwin API integration and service processing",
+    type: WorkItemType.feature,
+    status: WorkItemStatus.in_progress,
+    description: "Turn Darwin running data into reliable service state that Check-a-Train can use for delay eligibility and service explanation.",
+    acceptanceCriteria:
+      "- Darwin calls required for live service lookup are defined\n- Service status and timing data are normalised into stable domain shapes\n- Failure and partial data paths are handled explicitly",
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const retrieveLiveRunningData = await createWorkItem({
+    title: "Retrieve live running data from Darwin",
+    type: WorkItemType.story,
+    status: WorkItemStatus.in_progress,
+    parentId: darwinIntegrationAndProcessing.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const normaliseDarwinServiceData = await createWorkItem({
+    title: "Normalise Darwin service data into Product OS-friendly domain shapes",
+    type: WorkItemType.story,
+    status: WorkItemStatus.ready,
+    parentId: darwinIntegrationAndProcessing.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
   const fetchDarwinLiveRunningData = await createWorkItem({
     title: "Fetch Darwin live running data",
     type: WorkItemType.story,
     status: WorkItemStatus.in_progress,
     parentId: automaticDelayEligibilityDetection.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const defineDarwinRequestResponseHandling = await createWorkItem({
+    title: "Define Darwin request and response handling",
+    type: WorkItemType.task,
+    status: WorkItemStatus.in_progress,
+    description: "Specify the lookup inputs, expected service payloads, and the minimum metadata Check-a-Train needs from Darwin responses.",
+    parentId: retrieveLiveRunningData.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const handleDarwinApiFailureCases = await createWorkItem({
+    title: "Handle API failure and partial data cases",
+    type: WorkItemType.task,
+    status: WorkItemStatus.ready,
+    description: "Cover upstream failures, missing calling points, and degraded timing fields without presenting false confidence to the user.",
+    parentId: retrieveLiveRunningData.id,
     productId: product.id,
     createdBy: systemUserId,
   });
@@ -425,11 +607,89 @@ async function seedCheckATrain(systemUserId: string) {
     createdBy: systemUserId,
   });
 
+  const parseDarwinServiceTiming = await createWorkItem({
+    title: "Parse service status, calling points, and timing fields",
+    type: WorkItemType.task,
+    status: WorkItemStatus.ready,
+    description: "Map Darwin service status, station calling points, scheduled times, and expected times into stable internal fields.",
+    parentId: normaliseDarwinServiceData.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
   const calculateDelayEligibility = await createWorkItem({
     title: "Calculate delay eligibility from live running data",
     type: WorkItemType.task,
     status: WorkItemStatus.ready,
     parentId: fetchDarwinLiveRunningData.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const documentationFeature = await createWorkItem({
+    title: "Product documentation and enablement",
+    type: WorkItemType.feature,
+    status: WorkItemStatus.ready,
+    description: "Document how Check-a-Train is meant to be operated, explained, and maintained inside Product OS without creating a large speculative backlog.",
+    acceptanceCriteria:
+      "- Practical how-to and glossary content exists for Check-a-Train and Product OS usage\n- Product-level pages are linked to the relevant WorkItems\n- Architecture and operating notes cover current MVP assumptions",
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const createCheckATrainHowToGuides = await createWorkItem({
+    title: "Create product how-to guides",
+    type: WorkItemType.story,
+    status: WorkItemStatus.in_progress,
+    parentId: documentationFeature.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const defineCheckATrainGlossary = await createWorkItem({
+    title: "Define glossary of product and domain terms",
+    type: WorkItemType.story,
+    status: WorkItemStatus.ready,
+    parentId: documentationFeature.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const createCheckATrainOperatingNotes = await createWorkItem({
+    title: "Create architecture and operating notes",
+    type: WorkItemType.story,
+    status: WorkItemStatus.ready,
+    parentId: documentationFeature.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const addCheckATrainHowToContent = await createWorkItem({
+    title: "Add how-to content for using Check-a-Train",
+    type: WorkItemType.task,
+    status: WorkItemStatus.in_progress,
+    description: "Capture the user-facing flow for checking a delayed service, understanding likely eligibility, and starting the right operator claim path.",
+    parentId: createCheckATrainHowToGuides.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const addRailGlossaryEntries = await createWorkItem({
+    title: "Add glossary entries for rail delay and claim concepts",
+    type: WorkItemType.task,
+    status: WorkItemStatus.ready,
+    description: "Define terms such as Delay Repay, planned versus actual time, calling points, and likely eligibility so the product language stays consistent.",
+    parentId: defineCheckATrainGlossary.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const addCheckATrainOperatingNotes = await createWorkItem({
+    title: "Add architecture notes for Darwin-backed delay detection",
+    type: WorkItemType.task,
+    status: WorkItemStatus.ready,
+    description: "Record the current service-processing assumptions, data confidence boundaries, and how claim-handoff logic depends on Darwin-derived fields.",
+    parentId: createCheckATrainOperatingNotes.id,
     productId: product.id,
     createdBy: systemUserId,
   });
@@ -471,6 +731,12 @@ async function seedCheckATrain(systemUserId: string) {
       },
       {
         product_id: product.id,
+        from_work_item_id: darwinIntegrationAndProcessing.id,
+        to_work_item_id: delayDetectionAccuracyKpi.id,
+        relationship_type: RelationshipType.impacts,
+      },
+      {
+        product_id: product.id,
         from_work_item_id: operatorClaimHandoff.id,
         to_work_item_id: claimConversionRateKpi.id,
         relationship_type: RelationshipType.impacts,
@@ -480,6 +746,30 @@ async function seedCheckATrain(systemUserId: string) {
         from_work_item_id: operatorClaimHandoff.id,
         to_work_item_id: timeToClaimStartKpi.id,
         relationship_type: RelationshipType.impacts,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: darwinIntegrationAndProcessing.id,
+        to_work_item_id: automaticDelayEligibilityDetection.id,
+        relationship_type: RelationshipType.supports,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: defineDarwinRequestResponseHandling.id,
+        to_work_item_id: darwinHspIntegration.id,
+        relationship_type: RelationshipType.supports,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: parseDarwinServiceTiming.id,
+        to_work_item_id: calculateDelayEligibility.id,
+        relationship_type: RelationshipType.supports,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: handleDarwinApiFailureCases.id,
+        to_work_item_id: operatorClaimHandoff.id,
+        relationship_type: RelationshipType.informs,
       },
       {
         product_id: product.id,
@@ -497,6 +787,18 @@ async function seedCheckATrain(systemUserId: string) {
         product_id: product.id,
         from_work_item_id: liveRunningDataDecision.id,
         to_work_item_id: automaticDelayEligibilityDetection.id,
+        relationship_type: RelationshipType.informs,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: documentationFeature.id,
+        to_work_item_id: operatorClaimHandoff.id,
+        relationship_type: RelationshipType.supports,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: addCheckATrainOperatingNotes.id,
+        to_work_item_id: darwinIntegrationAndProcessing.id,
         relationship_type: RelationshipType.informs,
       },
     ],
@@ -527,6 +829,36 @@ async function seedCheckATrain(systemUserId: string) {
       body: "Architecture assumes live running data informs eligibility logic, with service detail exposed in-app before routing the user onward to an operator claim flow.",
       product_id: product.id,
       work_item_id: automaticDelayEligibilityDetection.id,
+      author_id: systemUserId,
+    },
+  });
+
+  const userHowToPage = await prisma.page.create({
+    data: {
+      title: "Check-a-Train how to check a delayed journey",
+      body: "How to enter a disrupted journey, review the returned service detail, understand likely Delay Repay eligibility, and move into the correct claim start.",
+      product_id: product.id,
+      work_item_id: addCheckATrainHowToContent.id,
+      author_id: systemUserId,
+    },
+  });
+
+  const railGlossaryPage = await prisma.page.create({
+    data: {
+      title: "Check-a-Train rail delay and claim glossary",
+      body: "Shared definitions for delay, calling points, expected time, actual time, likely eligibility, and operator claim concepts used in the MVP.",
+      product_id: product.id,
+      work_item_id: addRailGlossaryEntries.id,
+      author_id: systemUserId,
+    },
+  });
+
+  const operatingNotesPage = await prisma.page.create({
+    data: {
+      title: "Check-a-Train Darwin service processing notes",
+      body: "Working notes on how Darwin service data is requested, parsed, and used to explain likely delay eligibility without overstating certainty.",
+      product_id: product.id,
+      work_item_id: addCheckATrainOperatingNotes.id,
       author_id: systemUserId,
     },
   });
@@ -586,6 +918,14 @@ async function seedCheckATrain(systemUserId: string) {
       {
         product_id: product.id,
         from_entity_type: EntityType.work_item,
+        from_entity_id: darwinIntegrationAndProcessing.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: delayDetectionAccuracyKpi.id,
+        relationship_type: EntityLinkType.impacts,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.work_item,
         from_entity_id: operatorClaimHandoff.id,
         to_entity_type: EntityType.work_item,
         to_entity_id: claimConversionRateKpi.id,
@@ -629,6 +969,30 @@ async function seedCheckATrain(systemUserId: string) {
         from_entity_id: architectureNotesPage.id,
         to_entity_type: EntityType.work_item,
         to_entity_id: automaticDelayEligibilityDetection.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: userHowToPage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: addCheckATrainHowToContent.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: railGlossaryPage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: addRailGlossaryEntries.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: operatingNotesPage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: addCheckATrainOperatingNotes.id,
         relationship_type: EntityLinkType.documents,
       },
       {
