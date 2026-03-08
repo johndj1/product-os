@@ -231,6 +231,8 @@ Seeded `Check-a-Train` includes:
 - API endpoint: `POST /api/signals/ingest`
 - Accepts either the internal/manual contract (`productId` or `productSlug` plus Product OS signal fields) or a simple external contract for product-originated signals.
 - Optional event metadata fields: `source`, `sourceEventId`, `occurredAt`, and `tags`.
+- Product OS stores both the raw `signal_type` and a lightweight taxonomy layer: `signal_family` and `signal_category`.
+- Taxonomy exists so routing and future pattern detection can group signals at a stable family/category level without hardcoding every product-specific signal name.
 - Persists signal payload and applies deterministic routing to create follow-up WorkItems when rules match.
 - Repeated similar signals are deduplicated at the work-routing layer for active follow-up WorkItems, so repeated provider/API failures reuse the existing investigation WorkItem instead of creating duplicate delivery work.
 - Signals are still stored even when routing reuses an existing WorkItem.
@@ -254,11 +256,13 @@ Use this when another Product such as Check-a-Train wants to emit a meaningful s
 
 Current explicit mappings for the external contract:
 
-- `delay_detected` -> `external_change` with default severity `medium`
-- `claim_started` -> `usage_pattern` with default severity `low`
-- `darwin_api_error` -> `anomaly` with default severity `high`
+- `delay_detected` -> `external_change` with default severity `medium`, family `product_event`, category `operational`
+- `claim_started` -> `usage_pattern` with default severity `low`, family `user_behaviour`, category `behavioural`
+- `darwin_api_error` -> `anomaly` with default severity `high`, family `provider_failure`, category `reliability`
 
-Product OS resolves the Product by `product_slug`, derives a human-readable Signal title from `signal_name`, preserves the event timestamp on the stored Signal where possible, and stores `metadata` in the Signal payload.
+Default taxonomy for internal signal types stays explicit in code. Examples: `kpi_change` maps to `kpi_movement` / `outcome`, `test_failure` maps to `system_health` / `reliability`, and `deployment_event` maps to `product_event` / `operational`.
+
+Product OS resolves the Product by `product_slug`, derives a human-readable Signal title from `signal_name`, preserves the event timestamp on the stored Signal where possible, stores `metadata` in the Signal payload, and persists taxonomy on the Signal record.
 
 Deterministic routing rules:
 

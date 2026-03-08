@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { SignalStatus } from "@prisma/client";
+import { Prisma, SignalStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ingestSignal } from "@/lib/signal-ingestion";
 import {
   deriveSignalTitleFromName,
+  ExternalSignalName,
   getExternalSignalMapping,
   isExternalSignalName,
   isRecord,
@@ -33,7 +34,7 @@ type IngestRequestBody = {
 
 type ExternalSignalRequest = {
   productSlug: string;
-  signalName: string;
+  signalName: ExternalSignalName;
   timestamp: string;
   metadata: Record<string, unknown>;
 };
@@ -206,7 +207,7 @@ export async function POST(request: Request) {
     ? externalMapping?.defaultSeverity ?? null
     : body.severity?.trim() || null;
   const description = isExternalSignal ? null : body.description?.trim() || null;
-  const payload = isExternalSignal
+  const payload: Prisma.InputJsonValue = isExternalSignal
     ? {
         source,
         sourceEventId: null,
@@ -217,14 +218,14 @@ export async function POST(request: Request) {
           title: deriveSignalTitleFromName(externalRequest.signalName),
           contract: "product_signal_v1",
         },
-        raw: externalRequest.metadata,
+        raw: externalRequest.metadata as Prisma.InputJsonValue,
       }
     : {
         source,
         sourceEventId: sourceEventId || null,
         occurredAt: occurredAt || null,
         tags,
-        raw: body.payload ?? null,
+        raw: (body.payload as Prisma.InputJsonValue | undefined) ?? null,
       };
 
   const result = await ingestSignal(prisma, {

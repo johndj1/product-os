@@ -78,6 +78,23 @@ enum SignalStatus {
   resolved
 }
 
+enum SignalFamily {
+  provider_failure
+  user_behaviour
+  product_event
+  kpi_movement
+  system_health
+  insight
+}
+
+enum SignalCategory {
+  operational
+  behavioural
+  outcome
+  reliability
+  manual
+}
+
 enum UserType {
   member
   manager
@@ -257,6 +274,8 @@ model Signal {
   title             String
   description       String?
   signal_type       SignalType
+  signal_family     SignalFamily?
+  signal_category   SignalCategory?
   status            SignalStatus @default(new)
   severity          String?
   payload           Json?
@@ -275,5 +294,7 @@ model Signal {
 
   @@index([product_id])
   @@index([work_item_id])
+  @@index([signal_family])
+  @@index([signal_category])
   @@map("signals")
 }

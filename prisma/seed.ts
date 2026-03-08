@@ -1,4 +1,16 @@
-import { EntityLinkType, EntityType, PrismaClient, RelationshipType, SignalStatus, SignalType, UserType, WorkItemStatus, WorkItemType } from "@prisma/client";
+import {
+  EntityLinkType,
+  EntityType,
+  PrismaClient,
+  RelationshipType,
+  SignalCategory,
+  SignalFamily,
+  SignalStatus,
+  SignalType,
+  UserType,
+  WorkItemStatus,
+  WorkItemType,
+} from "@prisma/client";
 import { assertAllowedChildType } from "../src/lib/work-item-hierarchy";
 
 const prisma = new PrismaClient();
@@ -366,6 +378,8 @@ async function seedProductOS(systemUserId: string) {
       title: "First ingestion heartbeat",
       description: "Seeded baseline signal for workspace validation.",
       signal_type: SignalType.deployment_event,
+      signal_family: SignalFamily.product_event,
+      signal_category: SignalCategory.operational,
       status: SignalStatus.triaged,
       severity: "medium",
       payload: {
@@ -1049,6 +1063,8 @@ async function seedCheckATrain(systemUserId: string) {
       title: "Claim start latency remains above the MVP threshold",
       description: "Recent pilot checks show users still taking roughly two minutes from delay detection to opening an operator claim start flow.",
       signal_type: SignalType.kpi_change,
+      signal_family: SignalFamily.kpi_movement,
+      signal_category: SignalCategory.outcome,
       status: SignalStatus.triaged,
       severity: "medium",
       payload: {
@@ -1068,6 +1084,8 @@ async function seedCheckATrain(systemUserId: string) {
       description:
         "Repeated Darwin lookup failures crossed the agreed threshold in the current operating window, so the issue should be investigated as a single resilience problem rather than as isolated failures.",
       signal_type: SignalType.anomaly,
+      signal_family: SignalFamily.provider_failure,
+      signal_category: SignalCategory.reliability,
       status: SignalStatus.triaged,
       severity: "high",
       payload: {

@@ -6,7 +6,7 @@
 - `WorkItem`: main execution and planning node.
 - `Relationship`: directional edge between two WorkItems in the same Product.
 - `EntityLink`: additive directional edge between Product entities in the same Product context.
-- `Signal`: operational/feedback input, optionally linked to a WorkItem.
+- `Signal`: operational/feedback input, optionally linked to a WorkItem, with raw type plus lightweight taxonomy fields for grouping.
 - `Page`, `Comment`, `User`: supporting collaboration models.
 
 ## Product Graph Mapping
@@ -49,3 +49,10 @@
 ## Signal Types
 
 `kpi_change`, `customer_feedback`, `incident_alert`, `delivery_risk`, `test_failure`, `deployment_event`, `usage_pattern`, `anomaly`, `dependency_change`, `external_change`
+
+## Signal Taxonomy
+
+- `Signal.signal_type` remains the raw routing input and preserves the originating event shape.
+- `Signal.signal_family` groups signals into broader families such as `provider_failure`, `user_behaviour`, `product_event`, `kpi_movement`, `system_health`, and `insight`.
+- `Signal.signal_category` adds a lightweight cross-cutting category such as `operational`, `behavioural`, `outcome`, `reliability`, or `manual`.
+- External product-specific signals such as Check-a-Train `darwin_api_error` still map into Product OS `signal_type`, but now also persist family/category so routing and future pattern detection can work above raw event names.

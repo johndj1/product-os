@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient, SignalStatus, SignalType, WorkItemStatus, WorkItemType } from "@prisma/client";
+import { resolveSignalTaxonomy } from "@/lib/signals";
 
 const ACTIVE_WORK_ITEM_STATUSES: WorkItemStatus[] = [
   WorkItemStatus.new,
@@ -106,6 +107,13 @@ function isExternalSignalPayload(payload: Prisma.InputJsonValue | undefined): bo
   return externalSignal !== null;
 }
 
+function extractExternalSignalName(payload: Prisma.InputJsonValue | undefined): string | null {
+  const top = asObject(payload);
+  const externalSignal = asObject(top?.externalSignal as Prisma.InputJsonValue | undefined);
+  const signalName = externalSignal?.signalName;
+  return typeof signalName === "string" && signalName.trim().length > 0 ? signalName.trim() : null;
+}
+
 async function findActiveMatchingWorkItem(
   prisma: PrismaClient,
   productId: string,
@@ -175,6 +183,8 @@ export async function ingestSignal(prisma: PrismaClient, input: IngestSignalInpu
   let routingNote = "No routing rule matched.";
   const routingNotes: string[] = [];
   const isExternalSignal = isExternalSignalPayload(input.payload);
+  const externalSignalName = extractExternalSignalName(input.payload);
+  const taxonomy = resolveSignalTaxonomy(input.signalType, externalSignalName);
 
   if (input.signalType === "test_failure") {
     const bugTitle = `Investigate test failure: ${input.title}`;
@@ -313,6 +323,8 @@ export async function ingestSignal(prisma: PrismaClient, input: IngestSignalInpu
       title: input.title,
       description: input.description ?? null,
       signal_type: input.signalType,
+      signal_family: taxonomy.family,
+      signal_category: taxonomy.category,
       status,
       severity: input.severity ?? null,
       payload: input.payload,

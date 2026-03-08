@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { formatSignalTaxonomyValue } from "@/lib/signals";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,8 @@ export default async function ProductSignalsView({ params, searchParams }: Signa
         id: true,
         title: true,
         signal_type: true,
+        signal_family: true,
+        signal_category: true,
         status: true,
         severity: true,
         created_follow_up: true,
@@ -68,7 +71,7 @@ export default async function ProductSignalsView({ params, searchParams }: Signa
     <section className="grid gap-4">
       <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold text-slate-900">Signals</h2>
-        <p className="mt-2 text-sm text-slate-600">Signals route into Product work through deterministic rules.</p>
+        <p className="mt-2 text-sm text-slate-600">Signals route into Product work through deterministic rules, with lightweight taxonomy for grouping and future pattern detection.</p>
       </article>
 
       {errorMessage ? <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p> : null}
@@ -173,7 +176,19 @@ export default async function ProductSignalsView({ params, searchParams }: Signa
                   <p className="font-medium text-slate-900">{signal.title}</p>
                   <span className="rounded bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-600">{signal.status}</span>
                 </div>
-                <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">{signal.signal_type}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span className="uppercase tracking-wide text-slate-500">{signal.signal_type}</span>
+                  {signal.signal_family ? (
+                    <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                      family: {formatSignalTaxonomyValue(signal.signal_family)}
+                    </span>
+                  ) : null}
+                  {signal.signal_category ? (
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                      category: {formatSignalTaxonomyValue(signal.signal_category)}
+                    </span>
+                  ) : null}
+                </div>
                 {signal.severity ? <p className="mt-1 text-xs text-slate-500">Severity: {signal.severity}</p> : null}
                 {signal.work_item?.title ? <p className="mt-1 text-xs text-slate-500">Linked WorkItem: {signal.work_item.title}</p> : null}
                 {signal.work_item?._count.signals && signal.work_item._count.signals > 1 ? (
