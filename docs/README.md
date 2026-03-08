@@ -40,6 +40,11 @@ Worked examples that apply the templates in practice.
 4. Add architecture documentation.
 5. Keep mappings explicit to Product, WorkItem, Relationship, Signal, KPI, and Decision.
 
+## Suggested Reading For Personas And Journeys
+
+- Start with `docs/product-model/guidance/how-to-use-personas-and-journeys.md` for the minimal rules.
+- Then review `docs/product-examples/product-os/personas-and-journeys-thread.md` to see how the example personas and journeys connect into one operating loop.
+
 ## Documentation Rules
 
 - Describe implemented behavior only.
