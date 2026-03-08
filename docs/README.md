@@ -24,6 +24,7 @@ Key operations guidance:
 - `docs/platform/operations/local-development.md`: local setup and baseline verification
 - `docs/platform/operations/environment-strategy.md`: how to separate Product OS dev, stable personal prod, and a later shared/public direction
 - `docs/platform/operations/checkatrain-onboarding-and-environment-staging.md`: practical Check-a-Train onboarding path and environment staging guidance
+- `docs/platform/integrations/checkatrain-signal-ingestion.md`: Product OS signal contract and event examples for Check-a-Train
 
 ### 2) Product Model (`docs/product-model`)
 

@@ -14,6 +14,7 @@ type IngestSignalInput = {
   signalType: SignalType;
   severity?: string | null;
   status?: SignalStatus;
+  occurredAt?: Date | null;
   linkedWorkItemId?: string | null;
   payload?: Prisma.InputJsonValue;
 };
@@ -93,6 +94,24 @@ function extractKpiChangePayload(payload: Prisma.InputJsonValue | undefined): Kp
   };
 }
 
+async function createWorkItemFromSignal(
+  prisma: PrismaClient,
+  input: IngestSignalInput,
+  type: WorkItemType,
+  title: string,
+) {
+  return prisma.workItem.create({
+    data: {
+      product_id: input.productId,
+      type,
+      status: WorkItemStatus.new,
+      title,
+      description: workItemDescription(input),
+    },
+    select: { id: true },
+  });
+}
+
 export async function ingestSignal(prisma: PrismaClient, input: IngestSignalInput): Promise<IngestSignalResult> {
   let linkedWorkItemId = input.linkedWorkItemId ?? null;
   let createdFollowUp = false;
@@ -134,33 +153,23 @@ export async function ingestSignal(prisma: PrismaClient, input: IngestSignalInpu
   }
 
   if (input.signalType === "incident_alert") {
-    const incident = await prisma.workItem.create({
-      data: {
-        product_id: input.productId,
-        type: WorkItemType.incident,
-        status: WorkItemStatus.new,
-        title: `Incident alert: ${input.title}`,
-        description: workItemDescription(input),
-      },
-      select: { id: true },
-    });
+    const incident = await createWorkItemFromSignal(prisma, input, WorkItemType.incident, `Incident alert: ${input.title}`);
 
     linkedWorkItemId = incident.id;
     createdFollowUp = true;
     routingNote = "Created incident WorkItem from incident alert signal.";
   }
 
+  if (input.signalType === "anomaly" && isHighSeverity(input.severity)) {
+    const incident = await createWorkItemFromSignal(prisma, input, WorkItemType.incident, `Investigate anomaly: ${input.title}`);
+
+    linkedWorkItemId = incident.id;
+    createdFollowUp = true;
+    routingNotes.push("Created incident WorkItem from high-severity anomaly signal.");
+  }
+
   if (input.signalType === "kpi_change" && isHighSeverity(input.severity)) {
-    const research = await prisma.workItem.create({
-      data: {
-        product_id: input.productId,
-        type: WorkItemType.research,
-        status: WorkItemStatus.new,
-        title: `Investigate KPI change: ${input.title}`,
-        description: workItemDescription(input),
-      },
-      select: { id: true },
-    });
+    const research = await createWorkItemFromSignal(prisma, input, WorkItemType.research, `Investigate KPI change: ${input.title}`);
 
     linkedWorkItemId = research.id;
     createdFollowUp = true;
@@ -202,20 +211,19 @@ export async function ingestSignal(prisma: PrismaClient, input: IngestSignalInpu
   }
 
   if (input.signalType === "delivery_risk") {
-    const story = await prisma.workItem.create({
-      data: {
-        product_id: input.productId,
-        type: WorkItemType.story,
-        status: WorkItemStatus.new,
-        title: `Address delivery risk: ${input.title}`,
-        description: workItemDescription(input),
-      },
-      select: { id: true },
-    });
+    const story = await createWorkItemFromSignal(prisma, input, WorkItemType.story, `Address delivery risk: ${input.title}`);
 
     linkedWorkItemId = story.id;
     createdFollowUp = true;
     routingNotes.push("Created story WorkItem from delivery risk signal.");
+  }
+
+  if (input.signalType === "usage_pattern" && isHighSeverity(input.severity)) {
+    const research = await createWorkItemFromSignal(prisma, input, WorkItemType.research, `Investigate usage pattern: ${input.title}`);
+
+    linkedWorkItemId = research.id;
+    createdFollowUp = true;
+    routingNotes.push("Created research WorkItem from high-severity usage pattern signal.");
   }
 
   if (routingNotes.length > 0) {
@@ -236,6 +244,7 @@ export async function ingestSignal(prisma: PrismaClient, input: IngestSignalInpu
       work_item_id: linkedWorkItemId,
       created_follow_up: createdFollowUp,
       routing_note: routingNote,
+      created_at: input.occurredAt ?? undefined,
     },
     select: { id: true },
   });

@@ -229,14 +229,42 @@ Seeded `Check-a-Train` includes:
 ## Signal Ingestion (v1)
 
 - API endpoint: `POST /api/signals/ingest`
-- Accepts `productId` or `productSlug` and a signal payload.
+- Accepts either the internal/manual contract (`productId` or `productSlug` plus Product OS signal fields) or a simple external contract for product-originated signals.
+- Optional event metadata fields: `source`, `sourceEventId`, `occurredAt`, and `tags`.
 - Persists signal payload and applies deterministic routing to create follow-up WorkItems when rules match.
+
+### External Product Signal Contract
+
+Use this when another Product such as Check-a-Train wants to emit a meaningful signal without knowing Product OS internal signal types:
+
+```json
+{
+  "product_slug": "check-a-train",
+  "signal_name": "darwin_api_error",
+  "timestamp": "2026-03-08T12:00:00.000Z",
+  "metadata": {
+    "provider": "darwin",
+    "flow": "journey_lookup",
+    "error_type": "unavailable"
+  }
+}
+```
+
+Current explicit mappings for the external contract:
+
+- `delay_detected` -> `external_change` with default severity `medium`
+- `claim_started` -> `usage_pattern` with default severity `low`
+- `darwin_api_error` -> `anomaly` with default severity `high`
+
+Product OS resolves the Product by `product_slug`, derives a human-readable Signal title from `signal_name`, preserves the event timestamp on the stored Signal where possible, and stores `metadata` in the Signal payload.
 
 Deterministic routing rules:
 
 - `test_failure`: create a `bug` WorkItem if a matching active bug does not already exist.
 - `incident_alert`: create an `incident` WorkItem.
+- `anomaly` with high-equivalent severity (`high`, `critical`, `sev1`, `sev2`, `p0`, `p1`): create an `incident` WorkItem.
 - `kpi_change` with high-equivalent severity (`high`, `critical`, `sev1`, `sev2`, `p0`, `p1`): create a `research` WorkItem.
+- `usage_pattern` with high-equivalent severity (`high`, `critical`, `sev1`, `sev2`, `p0`, `p1`): create a `research` WorkItem.
 - `delivery_risk`: create a `story` WorkItem.
 
 KPI tracking updates:
@@ -255,18 +283,44 @@ For `test_failure`, active bug statuses are:
 
 ### Curl Example
 
+Internal/manual contract:
+
 ```bash
 curl -X POST http://localhost:3000/api/signals/ingest \
   -H "Content-Type: application/json" \
   -d '{
-    "productSlug": "product-os",
-    "title": "Checkout test suite failure on main",
-    "description": "4 failures in payment flow tests after latest merge.",
-    "signalType": "test_failure",
+    "productSlug": "check-a-train",
+    "title": "Claim handoff completion dropped after service card change",
+    "description": "Users are reaching service details but fewer are continuing to operator claim flows.",
+    "signalType": "usage_pattern",
     "severity": "high",
+    "source": "check-a-train",
+    "sourceEventId": "usage-claim-handoff-2026-03-08-0900",
+    "occurredAt": "2026-03-08T09:00:00.000Z",
+    "tags": ["claim-handoff", "conversion"],
     "payload": {
-      "suite": "checkout-e2e",
-      "runId": "ci-19482"
+      "baselineCompletionRate": 0.41,
+      "currentCompletionRate": 0.27,
+      "comparisonWindow": "24h"
     }
   }'
 ```
+
+External contract:
+
+```bash
+curl -X POST http://localhost:3000/api/signals/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product_slug": "check-a-train",
+    "signal_name": "darwin_api_error",
+    "timestamp": "2026-03-08T12:00:00.000Z",
+    "metadata": {
+      "provider": "darwin",
+      "flow": "journey_lookup",
+      "error_type": "unavailable"
+    }
+  }'
+```
+
+For a Check-a-Train-specific integration guide, see `docs/platform/integrations/checkatrain-signal-ingestion.md`.

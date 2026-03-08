@@ -1,6 +1,6 @@
 # Check-a-Train Signal Ingestion
 
-This guide defines the Product OS signal contract that Check-a-Train should use when sending operational events into Product OS.
+This guide defines the simple external Product OS signal contract that Check-a-Train should use when sending operational events into Product OS.
 
 The goal is not to mirror every internal app event. The goal is to send a small set of signals that can:
 
@@ -16,52 +16,37 @@ Use the seeded Product slug:
 
 - `check-a-train`
 
-## Request Shape
+## External Request Shape
 
 ```json
 {
-  "productSlug": "check-a-train",
-  "title": "Eligibility confidence dropped on live departures",
-  "description": "Darwin responses are missing expected timestamps for several services.",
-  "signalType": "anomaly",
-  "severity": "high",
-  "source": "check-a-train",
-  "sourceEventId": "evt_01JQXYZ",
-  "occurredAt": "2026-03-08T09:14:00.000Z",
-  "tags": ["darwin", "eligibility", "prod"],
-  "payload": {
-    "environment": "production",
-    "journeyId": "1A23-2026-03-08",
-    "operatorCode": "LNER",
-    "delayMinutes": 37
+  "product_slug": "check-a-train",
+  "signal_name": "darwin_api_error",
+  "timestamp": "2026-03-08T09:14:00.000Z",
+  "metadata": {
+    "provider": "darwin",
+    "flow": "journey_lookup",
+    "error_type": "unavailable"
   }
 }
 ```
 
 ## Top-Level Fields
 
-- `productSlug` or `productId`: identify the Product in Product OS. Check-a-Train should use `productSlug: "check-a-train"` unless it already stores the Product ID.
-- `title`: short human-readable signal title.
-- `description`: optional operational detail for triage.
-- `signalType`: one of the Product OS signal types.
-- `severity`: optional free-form severity. High-equivalent values are `high`, `critical`, `sev1`, `sev2`, `p0`, `p1`.
-- `source`: optional source system label. For Check-a-Train use `check-a-train`.
-- `sourceEventId`: optional upstream event identifier for correlation and dedupe outside Product OS.
-- `occurredAt`: optional ISO-8601 timestamp for when the event happened.
-- `tags`: optional string tags for filtering and downstream analysis.
-- `payload`: arbitrary JSON body with domain-specific data.
+- `product_slug`: identifies the Product in Product OS. Check-a-Train should use `check-a-train`.
+- `signal_name`: simple product-originated event name.
+- `timestamp`: ISO-8601 timestamp for when the event happened.
+- `metadata`: arbitrary JSON object with domain-specific event detail.
 
-Product OS stores `source`, `sourceEventId`, `occurredAt`, `tags`, and the raw `payload` inside the persisted signal payload.
+Product OS resolves the Product by slug, maps `signal_name` to an internal `SignalType`, derives a human-readable title, preserves the event timestamp on the stored Signal when possible, and stores `metadata` inside the persisted Signal payload.
 
 ## Recommended Signal Mapping
 
-Use the smallest event set that affects product operation.
+Use the smallest event set that affects product operation. Current explicit mappings:
 
-- `anomaly`: degraded delay detection confidence, missing Darwin/HSP fields, unusual eligibility calculation failures, or claim-handoff failures.
-- `usage_pattern`: meaningful shifts in user behaviour such as increased abandonment before claim handoff or unusually strong completion on a new flow.
-- `kpi_change`: rolled-up KPI value changes such as claim conversion rate or delay detection accuracy.
-- `incident_alert`: confirmed production incident requiring explicit incident handling.
-- `deployment_event`: deployments, rollback markers, or major config changes worth correlating with subsequent behaviour.
+- `delay_detected` -> `external_change`, default severity `medium`
+- `claim_started` -> `usage_pattern`, default severity `low`
+- `darwin_api_error` -> `anomaly`, default severity `high`
 
 Avoid sending every page view or low-signal interaction directly to Product OS. Aggregate those in Check-a-Train first, then emit usage or KPI signals that are materially useful for product decisions.
 
@@ -89,78 +74,61 @@ KPI title matching is exact within the Product.
 
 ## Suggested Check-a-Train Events
 
-### 1. Delay detection anomaly
+### 1. Delay detected
 
-Use when live-running data quality or eligibility confidence degrades enough to affect user trust.
+Use when Check-a-Train detects a delayed service and wants Product OS to record a meaningful external product signal.
 
 ```bash
 curl -X POST http://localhost:3000/api/signals/ingest \
   -H "Content-Type: application/json" \
   -d '{
-    "productSlug": "check-a-train",
-    "title": "Eligibility confidence dropped for Darwin-backed services",
-    "description": "Expected arrival timestamps were missing for 14% of monitored delayed services in the last 15 minutes.",
-    "signalType": "anomaly",
-    "severity": "high",
-    "source": "check-a-train",
-    "sourceEventId": "eligibility-anomaly-2026-03-08T09:15Z",
-    "occurredAt": "2026-03-08T09:15:00.000Z",
-    "tags": ["darwin", "eligibility", "production"],
-    "payload": {
-      "windowMinutes": 15,
-      "affectedServiceRate": 0.14,
-      "missingField": "expectedArrivalTime"
+    "product_slug": "check-a-train",
+    "signal_name": "delay_detected",
+    "timestamp": "2026-03-08T09:15:00.000Z",
+    "metadata": {
+      "journey_id": "1A23-2026-03-08",
+      "operator_code": "LNER",
+      "delay_minutes": 37,
+      "station_code": "KGX"
     }
   }'
 ```
 
-### 2. Claim-handoff usage change
+### 2. Claim started
 
-Use when user behaviour shifts enough to merit product investigation.
+Use when a customer enters the claim flow and you want Product OS to capture that meaningful product behaviour.
 
 ```bash
 curl -X POST http://localhost:3000/api/signals/ingest \
   -H "Content-Type: application/json" \
   -d '{
-    "productSlug": "check-a-train",
-    "title": "Claim handoff completion dropped after service card change",
-    "description": "Users are reaching the service detail step but fewer are continuing to operator claim flows.",
-    "signalType": "usage_pattern",
-    "severity": "high",
-    "source": "check-a-train",
-    "sourceEventId": "usage-claim-handoff-2026-03-08-0900",
-    "occurredAt": "2026-03-08T09:00:00.000Z",
-    "tags": ["claim-handoff", "conversion"],
-    "payload": {
-      "baselineCompletionRate": 0.41,
-      "currentCompletionRate": 0.27,
-      "comparisonWindow": "24h"
+    "product_slug": "check-a-train",
+    "signal_name": "claim_started",
+    "timestamp": "2026-03-08T09:00:00.000Z",
+    "metadata": {
+      "journey_id": "1A23-2026-03-08",
+      "operator_code": "LNER",
+      "claim_flow": "operator_redirect"
     }
   }'
 ```
 
-### 3. KPI rollup update
+### 3. Darwin API error
 
-Use for aggregated KPI changes, not single-user events.
+Use when an upstream Darwin failure affects Check-a-Train behaviour and should create a Product OS signal with a high-severity anomaly mapping.
 
 ```bash
 curl -X POST http://localhost:3000/api/signals/ingest \
   -H "Content-Type: application/json" \
   -d '{
-    "productSlug": "check-a-train",
-    "title": "Claim conversion rate weekly rollup",
-    "description": "Weekly conversion rate recomputed from production claim-start events.",
-    "signalType": "kpi_change",
-    "severity": "medium",
-    "source": "check-a-train",
-    "sourceEventId": "kpi-claim-conversion-2026-W10",
-    "occurredAt": "2026-03-08T08:00:00.000Z",
-    "tags": ["kpi", "conversion", "weekly"],
-    "payload": {
-      "kpiTitle": "Claim conversion rate",
-      "newValue": 24,
-      "previousValue": 18,
-      "window": "2026-W10"
+    "product_slug": "check-a-train",
+    "signal_name": "darwin_api_error",
+    "timestamp": "2026-03-08T08:00:00.000Z",
+    "metadata": {
+      "provider": "darwin",
+      "flow": "journey_lookup",
+      "error_type": "unavailable",
+      "retryable": true
     }
   }'
 ```
