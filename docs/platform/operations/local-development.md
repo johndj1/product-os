@@ -17,6 +17,12 @@
 
 App URL: `http://localhost:3000`
 
+## Environment Note
+
+This local environment is for Product OS development and validation. It is the right place to build Product OS, test schema and workflow changes, and pilot new Products such as Check-a-Train.
+
+It is not yet the trusted operating environment for live Product records. Until a separate stable production environment exists, treat local/dev usage as development or pilot usage rather than live trusted operations.
+
 ## Baseline Verification
 
 - Open Product workspace from `/`.

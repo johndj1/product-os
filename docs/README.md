@@ -19,6 +19,11 @@ Describes the implemented Product OS platform:
 - Architecture decisions (ADRs)
 - Operations guidance (local development, database, health checks)
 
+Key operations guidance:
+
+- `docs/platform/operations/local-development.md`: local setup and baseline verification
+- `docs/platform/operations/environment-strategy.md`: how to separate Product OS development use, pilot use, and future trusted production use
+
 ### 2) Product Model (`docs/product-model`)
 
 Reusable templates and guidance for documenting any Product managed in Product OS.

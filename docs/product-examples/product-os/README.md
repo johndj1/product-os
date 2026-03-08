@@ -2,6 +2,16 @@
 
 This folder documents Product OS as a Product using the reusable templates.
 
+Product OS plays two roles in this repository:
+
+- it is the platform under active construction
+- it is also the first dogfooded example Product documented inside that platform model
+
+That means this example should be read as both:
+
+- a worked Product definition for Product OS itself
+- a reference for how a real Product can be expressed using Product, WorkItem, Relationship, Signal, KPI, and Decision
+
 ## Contents
 
 - `pdd/`: Product definition
@@ -19,7 +29,7 @@ Full-Stack Product Owner
 
 ## Example Goal
 
-Show how Product OS concepts (WorkItem, Relationship, Signal, KPI, Decision) can be documented for a real Product that is already implemented.
+Show how Product OS concepts (WorkItem, Relationship, Signal, KPI, Decision) can be documented for a real Product that is already implemented, while also reflecting that Product OS is still being actively developed as a platform.
 
 ## How To Use The Personas And Journeys
 
