@@ -43,7 +43,13 @@ export default async function ProductSignalsView({ params, searchParams }: Signa
         updated_at: true,
         work_item: {
           select: {
+            id: true,
             title: true,
+            _count: {
+              select: {
+                signals: true,
+              },
+            },
           },
         },
       },
@@ -170,6 +176,9 @@ export default async function ProductSignalsView({ params, searchParams }: Signa
                 <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">{signal.signal_type}</p>
                 {signal.severity ? <p className="mt-1 text-xs text-slate-500">Severity: {signal.severity}</p> : null}
                 {signal.work_item?.title ? <p className="mt-1 text-xs text-slate-500">Linked WorkItem: {signal.work_item.title}</p> : null}
+                {signal.work_item?._count.signals && signal.work_item._count.signals > 1 ? (
+                  <p className="mt-1 text-xs text-slate-500">Linked WorkItem has {signal.work_item._count.signals} associated Signals.</p>
+                ) : null}
                 <p className="mt-1 text-xs text-slate-500">Created follow-up work: {signal.created_follow_up ? "yes" : "no"}</p>
                 {signal.routing_note ? <p className="mt-1 text-xs text-slate-500">Routing: {signal.routing_note}</p> : null}
                 <p className="mt-2 text-xs text-slate-500">Updated {signal.updated_at.toLocaleDateString()}</p>

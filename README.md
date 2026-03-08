@@ -232,6 +232,8 @@ Seeded `Check-a-Train` includes:
 - Accepts either the internal/manual contract (`productId` or `productSlug` plus Product OS signal fields) or a simple external contract for product-originated signals.
 - Optional event metadata fields: `source`, `sourceEventId`, `occurredAt`, and `tags`.
 - Persists signal payload and applies deterministic routing to create follow-up WorkItems when rules match.
+- Repeated similar signals are deduplicated at the work-routing layer for active follow-up WorkItems, so repeated provider/API failures reuse the existing investigation WorkItem instead of creating duplicate delivery work.
+- Signals are still stored even when routing reuses an existing WorkItem.
 
 ### External Product Signal Contract
 

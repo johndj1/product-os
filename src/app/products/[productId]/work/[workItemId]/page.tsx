@@ -99,6 +99,8 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
           title: true,
           signal_type: true,
           status: true,
+          created_follow_up: true,
+          routing_note: true,
         },
       },
       pages: {
@@ -193,6 +195,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
     signals,
   );
   const workItemEntityLinks = entityLinkData.grouped[`work_item:${workItemId}`] ?? { outgoing: [], incoming: [] };
+  const reusedSignalCount = workItem.signals.filter((signal) => signal.routing_note?.startsWith("Linked to existing active")).length;
 
   return (
     <section className="grid gap-4">
@@ -203,6 +206,12 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
           <span className={`rounded px-2 py-0.5 text-xs uppercase tracking-wide ${statusBadgeClass(workItem.status)}`}>{workItem.status}</span>
         </div>
         {workItem.description ? <p className="mt-2 text-sm text-slate-600">{workItem.description}</p> : <p className="mt-2 text-sm text-slate-500">No description provided.</p>}
+        {workItem.signals.length > 0 ? (
+          <p className="mt-2 text-xs text-slate-500">
+            {workItem.signals.length} linked Signals
+            {reusedSignalCount > 0 ? `, including ${reusedSignalCount} repeated routed event${reusedSignalCount === 1 ? "" : "s"}.` : "."}
+          </p>
+        ) : null}
       </article>
 
       {workItem.type === "decision" ? (
@@ -419,6 +428,9 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
                   <p className="mt-1 text-xs text-slate-500">
                     {signal.signal_type} - {signal.status}
                   </p>
+                  {signal.routing_note?.startsWith("Linked to existing active") ? (
+                    <p className="mt-1 text-xs text-slate-500">Reused existing follow-up WorkItem.</p>
+                  ) : null}
                 </li>
               ))}
             </ul>
