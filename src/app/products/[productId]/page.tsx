@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { buildWorkItemTree, WorkItemTreeNode } from "@/lib/product-workspace";
@@ -73,7 +74,7 @@ export default async function ProductOverviewPage({ params }: OverviewPageProps)
     notFound();
   }
 
-  const [kpis, workItems, recentWorkItems, recentSignals, recentPages, recentComments] = await Promise.all([
+  const [kpis, workItems, recentDecisions, recentWorkItems, recentSignals, recentPages, recentComments] = await Promise.all([
     prisma.workItem.findMany({
       where: {
         product_id: productId,
@@ -97,6 +98,12 @@ export default async function ProductOverviewPage({ params }: OverviewPageProps)
     prisma.workItem.findMany({
       where: { product_id: productId },
       orderBy: [{ created_at: "asc" }],
+    }),
+    prisma.workItem.findMany({
+      where: { product_id: productId, type: "decision" },
+      orderBy: { updated_at: "desc" },
+      take: 5,
+      select: { id: true, title: true, status: true },
     }),
     prisma.workItem.findMany({
       where: { product_id: productId },
@@ -245,6 +252,26 @@ export default async function ProductOverviewPage({ params }: OverviewPageProps)
           )}
         </article>
       </section>
+
+      <article className="rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="text-lg font-semibold text-slate-900">Recent Decisions</h2>
+        {recentDecisions.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">No decisions yet.</p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {recentDecisions.map((decision) => (
+              <li key={decision.id} className="rounded-md border border-slate-100 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Link href={`/products/${productId}/work/${decision.id}`} className="font-medium text-slate-900 hover:underline">
+                    {decision.title}
+                  </Link>
+                  <span className="rounded bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-600">{decision.status}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
 
       <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold text-slate-900">Golden Thread View</h2>

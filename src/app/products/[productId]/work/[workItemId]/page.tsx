@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { calculatePriorityForWorkItem } from "@/lib/priority-scoring";
 import { prisma } from "@/lib/prisma";
+import { getRelationshipsForProduct } from "@/lib/relationships";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +56,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
       title: true,
       type: true,
       status: true,
+      parent_id: true,
       description: true,
       acceptance_criteria: true,
       current_value: true,
@@ -126,6 +129,66 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
 
   const errorMessage = query.error ? detailMessages[query.error] ?? "Could not save comment." : null;
   const successMessage = query.success ? detailMessages[query.success] ?? "Saved." : null;
+  const relatedWorkItems = [
+    ...workItem.outgoing_relationships.map((relationship) => relationship.to_work_item),
+    ...workItem.incoming_relationships.map((relationship) => relationship.from_work_item),
+  ];
+  const relatedKpis = relatedWorkItems.filter((item) => item.type === "kpi");
+  const relatedWorkItemIds = [...new Set(relatedWorkItems.map((item) => item.id))];
+  const relatedSignals =
+    relatedWorkItemIds.length === 0
+      ? []
+      : await prisma.signal.findMany({
+          where: {
+            product_id: productId,
+            work_item_id: { in: relatedWorkItemIds },
+          },
+          orderBy: { updated_at: "desc" },
+          take: 8,
+          select: {
+            id: true,
+            title: true,
+            signal_type: true,
+            status: true,
+            work_item: {
+              select: { id: true, title: true },
+            },
+          },
+        });
+  const [allWorkItems, relationships, signals] = await Promise.all([
+    prisma.workItem.findMany({
+      where: { product_id: productId },
+      select: {
+        id: true,
+        title: true,
+        type: true,
+        status: true,
+        parent_id: true,
+      },
+    }),
+    getRelationshipsForProduct(prisma, productId),
+    prisma.signal.findMany({
+      where: { product_id: productId },
+      select: {
+        work_item_id: true,
+        status: true,
+        severity: true,
+      },
+    }),
+  ]);
+
+  const priority = calculatePriorityForWorkItem(
+    {
+      id: workItem.id,
+      title: workItem.title,
+      type: workItem.type,
+      status: workItem.status,
+      parent_id: workItem.parent_id,
+    },
+    allWorkItems,
+    relationships,
+    signals,
+  );
 
   return (
     <section className="grid gap-4">
@@ -138,6 +201,47 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
         {workItem.description ? <p className="mt-2 text-sm text-slate-600">{workItem.description}</p> : <p className="mt-2 text-sm text-slate-500">No description provided.</p>}
       </article>
 
+      {workItem.type === "decision" ? (
+        <article className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Decision Context</h3>
+          <p className="mt-2 text-sm text-slate-600">Decisions are WorkItems that capture product or architecture choices and their impact on delivery work.</p>
+
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Related KPIs</h4>
+              {relatedKpis.length === 0 ? (
+                <p className="mt-1 text-sm text-slate-500">No KPI links yet.</p>
+              ) : (
+                <ul className="mt-1 space-y-1">
+                  {relatedKpis.map((kpi) => (
+                    <li key={kpi.id}>
+                      <Link href={`/products/${productId}/work/${kpi.id}`} className="text-sm text-slate-700 underline">
+                        {kpi.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Related Signals</h4>
+              {relatedSignals.length === 0 ? (
+                <p className="mt-1 text-sm text-slate-500">No signals linked through related WorkItems.</p>
+              ) : (
+                <ul className="mt-1 space-y-1">
+                  {relatedSignals.map((signal) => (
+                    <li key={signal.id} className="text-sm text-slate-700">
+                      {signal.title} ({signal.signal_type}) via {signal.work_item?.title ?? "unknown"}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </article>
+      ) : null}
+
       <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Acceptance Criteria</h3>
         {workItem.acceptance_criteria ? (
@@ -145,6 +249,12 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
         ) : (
           <p className="mt-2 text-sm text-slate-500">No acceptance criteria defined for this WorkItem.</p>
         )}
+      </article>
+
+      <article className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Priority</h3>
+        <p className="mt-2 text-sm text-slate-700">Priority score: {priority.score}</p>
+        <p className="mt-1 text-xs text-slate-500">{priority.reason}</p>
       </article>
 
       {workItem.type === "kpi" ? (

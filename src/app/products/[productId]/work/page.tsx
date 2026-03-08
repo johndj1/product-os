@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { buildWorkItemTree, groupByType, WorkItemTreeNode } from "@/lib/product-workspace";
+import { calculatePriorityForProduct, WorkItemPriority } from "@/lib/priority-scoring";
 import { getRelationshipsForProduct, groupRelationshipsByWorkItem, RELATIONSHIP_TYPE_VALUES } from "@/lib/relationships";
 import { WORK_ITEM_STATUS_VALUES, WorkItemTypeValue } from "@/lib/work-item-rules";
+import DecisionCreateForm from "./decision-create-form";
 import WorkItemCreateForm from "./work-item-create-form";
 
 export const dynamic = "force-dynamic";
@@ -39,11 +41,17 @@ function statusBadgeClass(status: string): string {
   return "bg-slate-100 text-slate-700";
 }
 
+function typeBadgeClass(type: string): string {
+  if (type === "decision") return "bg-indigo-100 text-indigo-700";
+  return "bg-slate-100 text-slate-600";
+}
+
 function renderTree(
   productId: string,
   nodes: WorkItemTreeNode[],
   outgoingByWorkItem: Record<string, Awaited<ReturnType<typeof getRelationshipsForProduct>>>,
   incomingByWorkItem: Record<string, Awaited<ReturnType<typeof getRelationshipsForProduct>>>,
+  priorityByWorkItemId: Record<string, WorkItemPriority>,
 ) {
   if (nodes.length === 0) {
     return <p className="text-sm text-slate-500">No WorkItems found.</p>;
@@ -54,6 +62,7 @@ function renderTree(
       {nodes.map((node) => {
         const outgoing = outgoingByWorkItem[node.id] ?? [];
         const incoming = incomingByWorkItem[node.id] ?? [];
+        const priority = priorityByWorkItemId[node.id];
 
         return (
           <li key={node.id} className="rounded-md border border-slate-100 p-3">
@@ -62,7 +71,7 @@ function renderTree(
                 {node.title}
               </Link>
               <div className="flex items-center gap-2">
-                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-600">{node.type}</span>
+                <span className={`rounded px-2 py-0.5 text-xs uppercase tracking-wide ${typeBadgeClass(node.type)}`}>{node.type}</span>
                 <span className={`rounded px-2 py-0.5 text-xs uppercase tracking-wide ${statusBadgeClass(node.status)}`}>{node.status}</span>
               </div>
             </div>
@@ -82,6 +91,12 @@ function renderTree(
                 Save
               </button>
             </form>
+            {priority ? (
+              <div className="mt-2 rounded border border-slate-100 bg-slate-50 px-2 py-2">
+                <p className="text-xs font-medium text-slate-700">Priority score: {priority.score}</p>
+                <p className="mt-1 text-xs text-slate-500">{priority.reason}</p>
+              </div>
+            ) : null}
 
             {(outgoing.length > 0 || incoming.length > 0) && (
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -123,7 +138,9 @@ function renderTree(
             )}
 
             {node.children.length > 0 ? (
-              <div className="mt-3 border-l border-slate-200 pl-3">{renderTree(productId, node.children, outgoingByWorkItem, incomingByWorkItem)}</div>
+              <div className="mt-3 border-l border-slate-200 pl-3">
+                {renderTree(productId, node.children, outgoingByWorkItem, incomingByWorkItem, priorityByWorkItemId)}
+              </div>
             ) : null}
           </li>
         );
@@ -145,14 +162,27 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
     notFound();
   }
 
-  const workItems = await prisma.workItem.findMany({
-    where: { product_id: productId },
-    orderBy: [{ created_at: "asc" }],
-  });
-
-  const relationships = await getRelationshipsForProduct(prisma, productId);
+  const [workItems, relationships, signals] = await Promise.all([
+    prisma.workItem.findMany({
+      where: { product_id: productId },
+      orderBy: [{ created_at: "asc" }],
+    }),
+    getRelationshipsForProduct(prisma, productId),
+    prisma.signal.findMany({
+      where: { product_id: productId },
+      select: {
+        work_item_id: true,
+        status: true,
+        severity: true,
+      },
+    }),
+  ]);
 
   const grouped = groupByType(workItems);
+  const recentDecisions = workItems
+    .filter((item) => item.type === "decision")
+    .sort((a, b) => b.updated_at.getTime() - a.updated_at.getTime())
+    .slice(0, 6);
   const tree = buildWorkItemTree(workItems);
   const parentOptions = workItems.map((item) => ({
     id: item.id,
@@ -161,6 +191,14 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
   }));
 
   const { outgoingByWorkItem, incomingByWorkItem } = groupRelationshipsByWorkItem(relationships);
+  const priorities = calculatePriorityForProduct(workItems, relationships, signals);
+  const priorityByWorkItemId = Object.fromEntries(priorities.map((priority) => [priority.workItemId, priority])) as Record<string, WorkItemPriority>;
+  const workItemById = new Map(workItems.map((item) => [item.id, item]));
+  const recommendedNextWork = priorities
+    .map((priority) => ({ priority, workItem: workItemById.get(priority.workItemId) }))
+    .filter((entry): entry is { priority: WorkItemPriority; workItem: (typeof workItems)[number] } => Boolean(entry.workItem))
+    .filter((entry) => entry.workItem.status !== "done" && entry.workItem.status !== "cancelled")
+    .slice(0, 5);
 
   const errorMessage = query.error ? workMessages[query.error] ?? "Could not update WorkItem." : null;
   const successMessage = query.success ? workMessages[query.success] ?? "Saved." : null;
@@ -183,6 +221,13 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
       </article>
 
       <article className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Create Decision</h3>
+        <div className="mt-3">
+          <DecisionCreateForm productId={productId} />
+        </div>
+      </article>
+
+      <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Create Relationship</h3>
         <form action={`/products/${productId}/relationships/create`} method="post" className="mt-3 grid gap-3 sm:grid-cols-4">
           <div>
@@ -195,7 +240,7 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
               </option>
               {workItems.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.title} ({item.type})
+                  {item.title} ({item.type === "decision" ? "decision*" : item.type})
                 </option>
               ))}
             </select>
@@ -224,7 +269,7 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
               </option>
               {workItems.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.title} ({item.type})
+                  {item.title} ({item.type === "decision" ? "decision*" : item.type})
                 </option>
               ))}
             </select>
@@ -239,6 +284,30 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
       </article>
 
       <article className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Recommended Next Work</h3>
+        {recommendedNextWork.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">No active WorkItems to rank.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {recommendedNextWork.map((entry) => (
+              <li key={entry.workItem.id} className="rounded-md border border-slate-100 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Link href={`/products/${productId}/work/${entry.workItem.id}`} className="font-medium text-slate-900 hover:underline">
+                    {entry.workItem.title}
+                  </Link>
+                  <span className="rounded bg-slate-100 px-2 py-0.5 text-xs tracking-wide text-slate-700">Score {entry.priority.score}</span>
+                </div>
+                <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
+                  {entry.workItem.type} - {entry.workItem.status}
+                </p>
+                <p className="mt-2 text-xs text-slate-500">{entry.priority.reason}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
+
+      <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Grouped by Type</h3>
         {grouped.length === 0 ? (
           <p className="mt-2 text-sm text-slate-500">No WorkItems available.</p>
@@ -248,6 +317,27 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
               <li key={group.type} className="rounded-md border border-slate-100 p-3">
                 <p className="text-xs uppercase tracking-wide text-slate-500">{group.type}</p>
                 <p className="mt-1 text-xl font-semibold text-slate-900">{group.count}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
+
+      <article className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Decisions</h3>
+        {recentDecisions.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">No decisions yet.</p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {recentDecisions.map((decision) => (
+              <li key={decision.id} className="rounded-md border border-slate-100 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Link href={`/products/${productId}/work/${decision.id}`} className="font-medium text-slate-900 hover:underline">
+                    {decision.title}
+                  </Link>
+                  <span className={`rounded px-2 py-0.5 text-xs uppercase tracking-wide ${statusBadgeClass(decision.status)}`}>{decision.status}</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">Decision WorkItem</p>
               </li>
             ))}
           </ul>
@@ -277,7 +367,7 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
 
       <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Hierarchy</h3>
-        <div className="mt-3">{renderTree(productId, tree, outgoingByWorkItem, incomingByWorkItem)}</div>
+        <div className="mt-3">{renderTree(productId, tree, outgoingByWorkItem, incomingByWorkItem, priorityByWorkItemId)}</div>
       </article>
     </section>
   );

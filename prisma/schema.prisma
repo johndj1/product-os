@@ -90,6 +90,8 @@ model WorkItem {
   title       String
   description String?
   acceptance_criteria String?
+  priority_score Float?
+  priority_reason String?
   type        WorkItemType
   status      WorkItemStatus @default(new)
   current_value Float?

@@ -10,6 +10,13 @@ First usable Product workspace shell for an AI-native Product OS using Next.js, 
 - Prisma ORM
 - Supabase Postgres
 
+## Documentation
+
+- Platform documentation (system, architecture, decisions, operations): [`docs/platform`](docs/platform)
+- Reusable product-model templates and guidance: [`docs/product-model`](docs/product-model)
+- Worked product example using Product OS: [`docs/product-examples/product-os`](docs/product-examples/product-os)
+- Documentation index: [`docs/README.md`](docs/README.md)
+
 ## Setup
 
 1. Install dependencies:
@@ -60,6 +67,7 @@ Open `http://localhost:3000`.
 - `Page`, `Comment`, and `Signal` are scoped to a `Product`.
 - KPI measurement fields live on `WorkItem` when `type = kpi` (`current_value`, `target_value`, `unit`, `last_updated_at`).
 - Acceptance Criteria live on each `WorkItem` as `acceptance_criteria`.
+- Priority scoring fields live on `WorkItem` as `priority_score` and `priority_reason`.
 - Definition of Done lives on `Product` as `definition_of_done`.
 
 `WorkItemType` values:
@@ -157,11 +165,30 @@ Hierarchy vs relationships:
 - WorkItem status can be updated from the Work hierarchy using the status selector on each row.
 - Comments: add WorkItem comments from `/products/[productId]/work/[workItemId]` (comment body required, default system author).
 
+## Decisions In App
+
+- Decisions are implemented as `WorkItem` records with `type = decision`.
+- Create Decisions from the dedicated "Create Decision" panel in `/products/[productId]/work`.
+- View Decision details at `/products/[productId]/work/[workItemId]`, including acceptance criteria, related WorkItems, related KPI links, related Signals, and comments.
+- Connect Decisions to delivery and strategy WorkItems using the Relationship create form in the Work view.
+
 ## Completion Model (v1)
 
 - Acceptance Criteria are WorkItem-level and define completion expectations for a single WorkItem.
 - Definition of Done is Product-level and defines the shared quality bar for completed WorkItems in that Product.
 - Definition of Done is not duplicated across individual WorkItems.
+
+## Priority Scoring (v1)
+
+- Priority scoring is deterministic and explainable, not AI-generated.
+- Scores are calculated from Product context on page load and displayed with a human-readable reason.
+- Factors currently include:
+- Base score by `WorkItemType`.
+- Status weighting (`in_progress` and `ready` get positive weight, `done` and `cancelled` are penalized).
+- Strategic relevance to `kpi` / `outcome` (direct, hierarchical, or relationship-based).
+- Active linked signals and signal severity pressure.
+- Blocking/dependency pressure when active work is waiting on a WorkItem.
+- Low-context penalty for active WorkItems with little connected context.
 
 ## Signal Ingestion (v1)
 
