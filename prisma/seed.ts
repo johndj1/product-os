@@ -45,24 +45,7 @@ async function createWorkItem(input: CreateWorkItemInput) {
   });
 }
 
-async function main() {
-  await prisma.comment.deleteMany();
-  await prisma.page.deleteMany();
-  await prisma.signal.deleteMany();
-  await prisma.entityLink.deleteMany();
-  await prisma.relationship.deleteMany();
-  await prisma.workItem.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.user.deleteMany();
-
-  const systemUser = await prisma.user.create({
-    data: {
-      email: "system@product-os.local",
-      name: "Product OS System",
-      user_type: UserType.system,
-    },
-  });
-
+async function seedProductOS(systemUserId: string) {
   const product = await prisma.product.create({
     data: {
       name: "Product OS",
@@ -78,7 +61,7 @@ async function main() {
     type: WorkItemType.outcome,
     status: WorkItemStatus.in_progress,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   const kpi = await createWorkItem({
@@ -91,7 +74,7 @@ async function main() {
     lastUpdatedAt: new Date(),
     parentId: outcome.id,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   const coreGraphCapability = await createWorkItem({
@@ -99,7 +82,7 @@ async function main() {
     type: WorkItemType.capability,
     status: WorkItemStatus.in_progress,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   const canonicalDomainFeature = await createWorkItem({
@@ -108,7 +91,7 @@ async function main() {
     status: WorkItemStatus.in_progress,
     parentId: coreGraphCapability.id,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   const defineEntitiesStory = await createWorkItem({
@@ -117,7 +100,7 @@ async function main() {
     status: WorkItemStatus.done,
     parentId: canonicalDomainFeature.id,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   await createWorkItem({
@@ -126,7 +109,7 @@ async function main() {
     status: WorkItemStatus.done,
     parentId: defineEntitiesStory.id,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   const enforceHierarchyStory = await createWorkItem({
@@ -135,7 +118,7 @@ async function main() {
     status: WorkItemStatus.in_progress,
     parentId: canonicalDomainFeature.id,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   await createWorkItem({
@@ -144,7 +127,7 @@ async function main() {
     status: WorkItemStatus.in_progress,
     parentId: enforceHierarchyStory.id,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   const workspaceCapability = await createWorkItem({
@@ -152,7 +135,7 @@ async function main() {
     type: WorkItemType.capability,
     status: WorkItemStatus.in_progress,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   const workspaceShellFeature = await createWorkItem({
@@ -161,7 +144,7 @@ async function main() {
     status: WorkItemStatus.in_progress,
     parentId: workspaceCapability.id,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   const createOverviewStory = await createWorkItem({
@@ -172,7 +155,7 @@ async function main() {
       "- Overview route loads Product context\n- KPI summary and recent activity are visible\n- Golden-thread view renders without errors",
     parentId: workspaceShellFeature.id,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   await createWorkItem({
@@ -183,7 +166,7 @@ async function main() {
       "- Parent-child hierarchy is rendered in order\n- WorkItem type and status are visible per node\n- Empty state is shown when no WorkItems exist",
     parentId: workspaceShellFeature.id,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   const automationCapability = await createWorkItem({
@@ -191,7 +174,7 @@ async function main() {
     type: WorkItemType.capability,
     status: WorkItemStatus.ready,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   const signalIngestionFeature = await createWorkItem({
@@ -202,7 +185,7 @@ async function main() {
       "- Signals can be ingested via API and UI flow\n- Deterministic routing note is recorded on signal\n- Follow-up WorkItems are created for matching rules",
     parentId: automationCapability.id,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   const signalResearch = await createWorkItem({
@@ -210,7 +193,7 @@ async function main() {
     type: WorkItemType.research,
     status: WorkItemStatus.ready,
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   const routingDecision = await createWorkItem({
@@ -221,7 +204,7 @@ async function main() {
     acceptanceCriteria:
       "- EntityLink schema exists\n- Same-Product validation is enforced\n- Relevant Product and WorkItem views show cross-entity context",
     productId: product.id,
-    createdBy: systemUser.id,
+    createdBy: systemUserId,
   });
 
   await prisma.relationship.createMany({
@@ -265,7 +248,7 @@ async function main() {
       body: "Initial workspace notes for Product OS.",
       product_id: product.id,
       work_item_id: workspaceShellFeature.id,
-      author_id: systemUser.id,
+      author_id: systemUserId,
     },
   });
 
@@ -281,7 +264,7 @@ async function main() {
       },
       product_id: product.id,
       work_item_id: signalIngestionFeature.id,
-      reporter_id: systemUser.id,
+      reporter_id: systemUserId,
       routing_note: "Seed baseline signal.",
     },
   });
@@ -343,11 +326,361 @@ async function main() {
     data: {
       body: "Seeded baseline comment for overview metrics.",
       product_id: product.id,
-      author_id: systemUser.id,
+      author_id: systemUserId,
+    },
+  });
+}
+
+async function seedCheckATrain(systemUserId: string) {
+  const product = await prisma.product.create({
+    data: {
+      name: "Check-a-Train",
+      slug: "check-a-train",
+      description: "Delay Repay assistant that helps users identify eligible delayed rail journeys and start the right claim flow quickly.",
+      definition_of_done:
+        "- Delay eligibility logic is traceable to live running data assumptions\n- KPI impact is clear for shipped MVP changes\n- Claim-start flow changes are documented",
     },
   });
 
-  console.log("Seed complete: Product OS workspace initialized.");
+  const outcome = await createWorkItem({
+    title: "Make Delay Repay assistance fast enough that users start claims immediately after disruption",
+    type: WorkItemType.outcome,
+    status: WorkItemStatus.in_progress,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const claimConversionRateKpi = await createWorkItem({
+    title: "Claim conversion rate",
+    type: WorkItemType.kpi,
+    status: WorkItemStatus.ready,
+    currentValue: 18,
+    targetValue: 40,
+    unit: "%",
+    lastUpdatedAt: new Date(),
+    parentId: outcome.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const delayDetectionAccuracyKpi = await createWorkItem({
+    title: "Delay detection accuracy",
+    type: WorkItemType.kpi,
+    status: WorkItemStatus.ready,
+    currentValue: 82,
+    targetValue: 95,
+    unit: "%",
+    lastUpdatedAt: new Date(),
+    parentId: outcome.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const timeToClaimStartKpi = await createWorkItem({
+    title: "Time from delay to claim start",
+    type: WorkItemType.kpi,
+    status: WorkItemStatus.ready,
+    currentValue: 120,
+    targetValue: 30,
+    unit: "seconds",
+    lastUpdatedAt: new Date(),
+    parentId: outcome.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const automaticDelayEligibilityDetection = await createWorkItem({
+    title: "Automatic delay eligibility detection",
+    type: WorkItemType.feature,
+    status: WorkItemStatus.in_progress,
+    description: "Surface likely Delay Repay eligibility from live train running data before the user has to interpret station boards manually.",
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const operatorClaimHandoff = await createWorkItem({
+    title: "Operator claim handoff",
+    type: WorkItemType.feature,
+    status: WorkItemStatus.ready,
+    description: "Guide the user from detected delay into the correct operator claim path with the minimum next-step friction.",
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const fetchDarwinLiveRunningData = await createWorkItem({
+    title: "Fetch Darwin live running data",
+    type: WorkItemType.story,
+    status: WorkItemStatus.in_progress,
+    parentId: automaticDelayEligibilityDetection.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const darwinHspIntegration = await createWorkItem({
+    title: "Implement Darwin / HSP integration",
+    type: WorkItemType.task,
+    status: WorkItemStatus.ready,
+    parentId: fetchDarwinLiveRunningData.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const calculateDelayEligibility = await createWorkItem({
+    title: "Calculate delay eligibility from live running data",
+    type: WorkItemType.task,
+    status: WorkItemStatus.ready,
+    parentId: fetchDarwinLiveRunningData.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const buildServiceCardExpansion = await createWorkItem({
+    title: "Build service card expansion for more detail",
+    type: WorkItemType.task,
+    status: WorkItemStatus.new,
+    description: "Show the train service breakdown that explains why a journey looks Delay Repay eligible before the user leaves for a claim flow.",
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const delayRepayFocusDecision = await createWorkItem({
+    title: "MVP focuses on Delay Repay assistance, not journey planning",
+    type: WorkItemType.decision,
+    status: WorkItemStatus.done,
+    description: "Keep the first serious pilot tightly scoped around identifying eligible disrupted journeys and routing users to the right claim start.",
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const liveRunningDataDecision = await createWorkItem({
+    title: "Delay eligibility is derived from live running data before any claim handoff",
+    type: WorkItemType.decision,
+    status: WorkItemStatus.done,
+    description: "Eligibility confidence should come from running data first so the claim handoff reflects what actually happened to the service.",
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  await prisma.relationship.createMany({
+    data: [
+      {
+        product_id: product.id,
+        from_work_item_id: automaticDelayEligibilityDetection.id,
+        to_work_item_id: delayDetectionAccuracyKpi.id,
+        relationship_type: RelationshipType.impacts,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: operatorClaimHandoff.id,
+        to_work_item_id: claimConversionRateKpi.id,
+        relationship_type: RelationshipType.impacts,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: operatorClaimHandoff.id,
+        to_work_item_id: timeToClaimStartKpi.id,
+        relationship_type: RelationshipType.impacts,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: darwinHspIntegration.id,
+        to_work_item_id: calculateDelayEligibility.id,
+        relationship_type: RelationshipType.supports,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: buildServiceCardExpansion.id,
+        to_work_item_id: operatorClaimHandoff.id,
+        relationship_type: RelationshipType.supports,
+      },
+      {
+        product_id: product.id,
+        from_work_item_id: liveRunningDataDecision.id,
+        to_work_item_id: automaticDelayEligibilityDetection.id,
+        relationship_type: RelationshipType.informs,
+      },
+    ],
+  });
+
+  const productDefinitionPage = await prisma.page.create({
+    data: {
+      title: "Check-a-Train Product definition",
+      body: "Check-a-Train helps users quickly spot likely Delay Repay eligibility and move into the correct operator claim start without pretending to replace journey planning.",
+      product_id: product.id,
+      author_id: systemUserId,
+    },
+  });
+
+  const mvpScopePage = await prisma.page.create({
+    data: {
+      title: "Check-a-Train MVP scope",
+      body: "Initial scope covers live delay detection, clear explanation of likely eligibility, and operator claim handoff. It does not attempt broad journey planning or ticket retail.",
+      product_id: product.id,
+      work_item_id: operatorClaimHandoff.id,
+      author_id: systemUserId,
+    },
+  });
+
+  const architectureNotesPage = await prisma.page.create({
+    data: {
+      title: "Check-a-Train architecture notes",
+      body: "Architecture assumes live running data informs eligibility logic, with service detail exposed in-app before routing the user onward to an operator claim flow.",
+      product_id: product.id,
+      work_item_id: automaticDelayEligibilityDetection.id,
+      author_id: systemUserId,
+    },
+  });
+
+  const kpiMovementSignal = await prisma.signal.create({
+    data: {
+      title: "Claim start latency remains above the MVP threshold",
+      description: "Recent pilot checks show users still taking roughly two minutes from delay detection to opening an operator claim start flow.",
+      signal_type: SignalType.kpi_change,
+      status: SignalStatus.triaged,
+      severity: "medium",
+      payload: {
+        observed_seconds: 120,
+        target_seconds: 30,
+      },
+      product_id: product.id,
+      work_item_id: operatorClaimHandoff.id,
+      reporter_id: systemUserId,
+      routing_note: "Review handoff clarity and service detail before expanding scope.",
+    },
+  });
+
+  await prisma.entityLink.createMany({
+    data: [
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.product,
+        from_entity_id: product.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: claimConversionRateKpi.id,
+        relationship_type: EntityLinkType.measures,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.product,
+        from_entity_id: product.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: delayDetectionAccuracyKpi.id,
+        relationship_type: EntityLinkType.measures,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.product,
+        from_entity_id: product.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: timeToClaimStartKpi.id,
+        relationship_type: EntityLinkType.measures,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.work_item,
+        from_entity_id: automaticDelayEligibilityDetection.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: delayDetectionAccuracyKpi.id,
+        relationship_type: EntityLinkType.impacts,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.work_item,
+        from_entity_id: operatorClaimHandoff.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: claimConversionRateKpi.id,
+        relationship_type: EntityLinkType.impacts,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.work_item,
+        from_entity_id: delayRepayFocusDecision.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: operatorClaimHandoff.id,
+        relationship_type: EntityLinkType.informs,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.work_item,
+        from_entity_id: liveRunningDataDecision.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: automaticDelayEligibilityDetection.id,
+        relationship_type: EntityLinkType.informs,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: productDefinitionPage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: delayRepayFocusDecision.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: mvpScopePage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: operatorClaimHandoff.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: architectureNotesPage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: automaticDelayEligibilityDetection.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.signal,
+        from_entity_id: kpiMovementSignal.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: timeToClaimStartKpi.id,
+        relationship_type: EntityLinkType.impacts,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.signal,
+        from_entity_id: kpiMovementSignal.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: operatorClaimHandoff.id,
+        relationship_type: EntityLinkType.triggered_by,
+      },
+    ],
+  });
+
+  await prisma.comment.create({
+    data: {
+      body: "Seeded pilot product to exercise Product OS against a real product graph without importing a full historical backlog.",
+      product_id: product.id,
+      author_id: systemUserId,
+    },
+  });
+}
+
+async function main() {
+  await prisma.comment.deleteMany();
+  await prisma.page.deleteMany();
+  await prisma.signal.deleteMany();
+  await prisma.entityLink.deleteMany();
+  await prisma.relationship.deleteMany();
+  await prisma.workItem.deleteMany();
+  await prisma.product.deleteMany();
+  await prisma.user.deleteMany();
+
+  const systemUser = await prisma.user.create({
+    data: {
+      email: "system@product-os.local",
+      name: "Product OS System",
+      user_type: UserType.system,
+    },
+  });
+
+  await seedProductOS(systemUser.id);
+  await seedCheckATrain(systemUser.id);
+
+  console.log("Seed complete: Product OS and Check-a-Train workspaces initialized.");
 }
 
 main()

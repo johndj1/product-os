@@ -158,7 +158,9 @@ Hierarchy vs relationships:
 
 ## Seeded Product
 
-`npm run db:seed` creates Product `Product OS` with:
+`npm run db:seed` creates Products `Product OS` and `Check-a-Train`.
+
+Seeded `Product OS` includes:
 
 - Product-level Definition of Done baseline
 - Outcome and KPI chain for strategic traceability
@@ -167,6 +169,15 @@ Hierarchy vs relationships:
 - Capability, Feature, Story, Task chain for delivery traceability
 - Seeded page, signal, and comment for workspace visibility
 - Seeded EntityLinks covering Product-to-KPI, Signal-to-KPI, Signal-to-WorkItem, Page-to-WorkItem, and Decision-to-WorkItem examples
+
+Seeded `Check-a-Train` includes:
+
+- Product baseline for the first serious pilot Product in Product OS dev
+- One outcome, three KPI WorkItems, and a small MVP-oriented WorkItem graph
+- Decisions clarifying MVP focus around Delay Repay assistance and live-data-derived eligibility
+- Supporting pages for product definition, MVP scope, and architecture notes
+- A seeded KPI movement signal to exercise signal-driven follow-up work in the UI
+- Minimal Relationships and EntityLinks so the Product graph is meaningful without importing a full backlog
 
 ## Routes
 

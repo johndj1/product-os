@@ -7,16 +7,16 @@ type ProductListItem = {
   id: string;
   name: string;
   slug: string;
+  description: string | null;
+  workItemCount: number;
+  pageCount: number;
   signalCount: number;
 };
 
 type DashboardData = {
   products: ProductListItem[];
-  topLevelWorkItems: Array<{
-    id: string;
-    title: string;
-    type: string;
-  }>;
+  totalWorkItems: number;
+  totalKpis: number;
   signalCount: number;
   error: string | null;
 };
@@ -28,29 +28,16 @@ async function loadDashboard(): Promise<DashboardData> {
       include: {
         _count: {
           select: {
+            work_items: true,
+            pages: true,
             signals: true,
           },
         },
       },
     });
 
-    const productOS = products.find((product) => product.slug === "product-os") ?? null;
-
-    const topLevelWorkItems = productOS
-      ? await prisma.workItem.findMany({
-          where: {
-            product_id: productOS.id,
-            parent_id: null,
-          },
-          select: {
-            id: true,
-            title: true,
-            type: true,
-          },
-          orderBy: [{ type: "asc" }, { created_at: "asc" }],
-        })
-      : [];
-
+    const totalWorkItems = await prisma.workItem.count();
+    const totalKpis = await prisma.workItem.count({ where: { type: "kpi" } });
     const signalCount = await prisma.signal.count();
 
     return {
@@ -58,16 +45,21 @@ async function loadDashboard(): Promise<DashboardData> {
         id: product.id,
         name: product.name,
         slug: product.slug,
+        description: product.description,
+        workItemCount: product._count.work_items,
+        pageCount: product._count.pages,
         signalCount: product._count.signals,
       })),
-      topLevelWorkItems,
+      totalWorkItems,
+      totalKpis,
       signalCount,
       error: null,
     };
   } catch (error) {
     return {
       products: [],
-      topLevelWorkItems: [],
+      totalWorkItems: 0,
+      totalKpis: 0,
       signalCount: 0,
       error: String(error),
     };
@@ -105,51 +97,47 @@ export default async function Home() {
         </article>
 
         <article className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Top-level WorkItems</p>
-          <p className="mt-2 text-3xl font-semibold text-slate-900">{data.topLevelWorkItems.length}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">WorkItems</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-900">{data.totalWorkItems}</p>
         </article>
 
         <article className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Signals</p>
-          <p className="mt-2 text-3xl font-semibold text-slate-900">{data.signalCount}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">KPIs</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-900">{data.totalKpis}</p>
         </article>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <article className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="text-lg font-semibold text-slate-900">Products</h2>
-          <ul className="mt-3 space-y-2">
-            {data.products.map((product) => (
-              <li key={product.id} className="rounded-md border border-slate-100 p-3">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="font-medium text-slate-900">{product.name}</p>
-                    <p className="text-xs text-slate-500">/{product.slug}</p>
-                  </div>
-                  <Link href={`/products/${product.id}`} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                    Open workspace
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </article>
+      <section className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Products</h2>
+            <p className="mt-1 text-sm text-slate-600">Browse the active Product graph. Check-a-Train is seeded as the first serious pilot alongside Product OS.</p>
+          </div>
+          <p className="text-sm text-slate-500">{data.signalCount} total signals</p>
+        </div>
 
-        <article className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="text-lg font-semibold text-slate-900">Top-level WorkItems for Product OS</h2>
-          <ul className="mt-3 space-y-2">
-            {data.topLevelWorkItems.length === 0 ? (
-              <li className="rounded-md border border-dashed border-slate-200 p-3 text-sm text-slate-500">No WorkItems found.</li>
-            ) : (
-              data.topLevelWorkItems.map((item) => (
-                <li key={item.id} className="rounded-md border border-slate-100 p-3">
-                  <p className="font-medium text-slate-900">{item.title}</p>
-                  <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">{item.type}</p>
-                </li>
-              ))
-            )}
-          </ul>
-        </article>
+        <ul className="mt-4 grid gap-3 lg:grid-cols-2">
+          {data.products.map((product) => (
+            <li key={product.id} className="rounded-lg border border-slate-100 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="font-medium text-slate-900">{product.name}</p>
+                  <p className="text-xs text-slate-500">/{product.slug}</p>
+                  {product.description ? <p className="text-sm text-slate-600">{product.description}</p> : null}
+                </div>
+                <Link href={`/products/${product.id}`} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                  Open workspace
+                </Link>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600">
+                <span className="rounded bg-slate-100 px-2 py-1">{product.workItemCount} WorkItems</span>
+                <span className="rounded bg-slate-100 px-2 py-1">{product.pageCount} Pages</span>
+                <span className="rounded bg-slate-100 px-2 py-1">{product.signalCount} Signals</span>
+              </div>
+            </li>
+          ))}
+        </ul>
       </section>
     </main>
   );
