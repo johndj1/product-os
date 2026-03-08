@@ -8,6 +8,7 @@ This folder documents Product OS as a Product using the reusable templates.
 - `personas/`: primary and supporting personas
 - `journeys/`: realistic usage journeys
 - `journeys/execute-work-item-end-to-end.md`: shows how prioritised work is executed, validated, completed, and fed back into Product OS
+- `journeys/respond-to-kpi-movement-and-create-follow-up-work.md`: shows how KPI movement is interpreted, converted into follow-up WorkItems or Decisions, and fed back into prioritisation
 - `personas-and-journeys-thread.md`: connects the persona set and journey set into one operating loop
 - `kpis/`: KPI definitions
 - `decisions/`: key product-level decisions
