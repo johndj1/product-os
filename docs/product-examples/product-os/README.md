@@ -7,6 +7,7 @@ This folder documents Product OS as a Product using the reusable templates.
 - `pdd/`: Product definition
 - `personas/`: primary and supporting personas
 - `journeys/`: realistic usage journeys
+- `journeys/execute-work-item-end-to-end.md`: shows how prioritised work is executed, validated, completed, and fed back into Product OS
 - `personas-and-journeys-thread.md`: connects the persona set and journey set into one operating loop
 - `kpis/`: KPI definitions
 - `decisions/`: key product-level decisions
