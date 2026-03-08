@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getEntityLinkOptionsForProduct, getGroupedEntityLinksForProduct } from "@/lib/entity-links";
 import { prisma } from "@/lib/prisma";
 import { buildWorkItemTree, groupByType, WorkItemTreeNode } from "@/lib/product-workspace";
 import { calculatePriorityForProduct, WorkItemPriority } from "@/lib/priority-scoring";
 import { getRelationshipsForProduct, groupRelationshipsByWorkItem, RELATIONSHIP_TYPE_VALUES } from "@/lib/relationships";
 import { WORK_ITEM_STATUS_VALUES, WorkItemTypeValue } from "@/lib/work-item-rules";
 import DecisionCreateForm from "./decision-create-form";
+import EntityLinkCreateForm from "./entity-link-create-form";
 import WorkItemCreateForm from "./work-item-create-form";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +32,13 @@ const workMessages: Record<string, string> = {
   relationship_self_link_not_allowed: "A WorkItem cannot link to itself.",
   relationship_type_invalid: "Relationship type is invalid.",
   relationship_duplicate: "This relationship already exists.",
+  entitylink_created: "EntityLink created.",
+  entitylink_entities_required: "From and To entities are required.",
+  entitylink_entity_type_invalid: "Entity type is invalid.",
+  entitylink_entities_invalid: "Selected entities must belong to this Product.",
+  entitylink_self_link_not_allowed: "An entity cannot link to itself.",
+  entitylink_relationship_type_invalid: "EntityLink type is invalid.",
+  entitylink_duplicate: "This EntityLink already exists.",
 };
 
 function statusBadgeClass(status: string): string {
@@ -162,7 +171,7 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
     notFound();
   }
 
-  const [workItems, relationships, signals] = await Promise.all([
+  const [workItems, relationships, signals, entityLinkData, entityOptions] = await Promise.all([
     prisma.workItem.findMany({
       where: { product_id: productId },
       orderBy: [{ created_at: "asc" }],
@@ -176,6 +185,8 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
         severity: true,
       },
     }),
+    getGroupedEntityLinksForProduct(prisma, productId),
+    getEntityLinkOptionsForProduct(prisma, productId),
   ]);
 
   const grouped = groupByType(workItems);
@@ -194,6 +205,7 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
   const priorities = calculatePriorityForProduct(workItems, relationships, signals);
   const priorityByWorkItemId = Object.fromEntries(priorities.map((priority) => [priority.workItemId, priority])) as Record<string, WorkItemPriority>;
   const workItemById = new Map(workItems.map((item) => [item.id, item]));
+  const recentEntityLinks = entityLinkData.links.slice(0, 6);
   const recommendedNextWork = priorities
     .map((priority) => ({ priority, workItem: workItemById.get(priority.workItemId) }))
     .filter((entry): entry is { priority: WorkItemPriority; workItem: (typeof workItems)[number] } => Boolean(entry.workItem))
@@ -284,6 +296,14 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
       </article>
 
       <article className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Create EntityLink</h3>
+        <p className="mt-2 text-sm text-slate-600">Use EntityLinks for cross-entity connections across Product, WorkItems, Signals, and Pages.</p>
+        <div className="mt-3">
+          <EntityLinkCreateForm productId={productId} entityOptions={entityOptions} />
+        </div>
+      </article>
+
+      <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Recommended Next Work</h3>
         {recommendedNextWork.length === 0 ? (
           <p className="mt-2 text-sm text-slate-500">No active WorkItems to rank.</p>
@@ -317,6 +337,25 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
               <li key={group.type} className="rounded-md border border-slate-100 p-3">
                 <p className="text-xs uppercase tracking-wide text-slate-500">{group.type}</p>
                 <p className="mt-1 text-xl font-semibold text-slate-900">{group.count}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
+
+      <article className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Recent EntityLinks</h3>
+          <p className="text-xs text-slate-500">Total: {entityLinkData.links.length}</p>
+        </div>
+        {recentEntityLinks.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">No EntityLinks yet.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {recentEntityLinks.map((link) => (
+              <li key={link.id} className="rounded-md border border-slate-100 p-3 text-sm text-slate-700">
+                <span className="font-medium text-slate-900">{link.fromEntity.title}</span> ({link.fromEntity.meta}) {link.relationshipType}{" "}
+                <span className="font-medium text-slate-900">{link.toEntity.title}</span> ({link.toEntity.meta})
               </li>
             ))}
           </ul>

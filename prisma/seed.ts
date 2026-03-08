@@ -1,4 +1,4 @@
-import { PrismaClient, RelationshipType, SignalStatus, SignalType, UserType, WorkItemStatus, WorkItemType } from "@prisma/client";
+import { EntityLinkType, EntityType, PrismaClient, RelationshipType, SignalStatus, SignalType, UserType, WorkItemStatus, WorkItemType } from "@prisma/client";
 import { assertAllowedChildType } from "../src/lib/work-item-hierarchy";
 
 const prisma = new PrismaClient();
@@ -49,6 +49,7 @@ async function main() {
   await prisma.comment.deleteMany();
   await prisma.page.deleteMany();
   await prisma.signal.deleteMany();
+  await prisma.entityLink.deleteMany();
   await prisma.relationship.deleteMany();
   await prisma.workItem.deleteMany();
   await prisma.product.deleteMany();
@@ -212,6 +213,17 @@ async function main() {
     createdBy: systemUser.id,
   });
 
+  const routingDecision = await createWorkItem({
+    title: "Adopt generic cross-entity links",
+    type: WorkItemType.decision,
+    status: WorkItemStatus.ready,
+    description: "Introduce a simple, additive link model for Product, WorkItem, Signal, and Page connections.",
+    acceptanceCriteria:
+      "- EntityLink schema exists\n- Same-Product validation is enforced\n- Relevant Product and WorkItem views show cross-entity context",
+    productId: product.id,
+    createdBy: systemUser.id,
+  });
+
   await prisma.relationship.createMany({
     data: [
       {
@@ -247,7 +259,7 @@ async function main() {
     ],
   });
 
-  await prisma.page.create({
+  const overviewPage = await prisma.page.create({
     data: {
       title: "Product OS Overview",
       body: "Initial workspace notes for Product OS.",
@@ -257,7 +269,7 @@ async function main() {
     },
   });
 
-  await prisma.signal.create({
+  const ingestionHeartbeatSignal = await prisma.signal.create({
     data: {
       title: "First ingestion heartbeat",
       description: "Seeded baseline signal for workspace validation.",
@@ -272,6 +284,59 @@ async function main() {
       reporter_id: systemUser.id,
       routing_note: "Seed baseline signal.",
     },
+  });
+
+  await prisma.entityLink.createMany({
+    data: [
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.product,
+        from_entity_id: product.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: kpi.id,
+        relationship_type: EntityLinkType.measures,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.signal,
+        from_entity_id: ingestionHeartbeatSignal.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: kpi.id,
+        relationship_type: EntityLinkType.impacts,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.signal,
+        from_entity_id: ingestionHeartbeatSignal.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: signalIngestionFeature.id,
+        relationship_type: EntityLinkType.triggered_by,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: overviewPage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: workspaceShellFeature.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.work_item,
+        from_entity_id: routingDecision.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: canonicalDomainFeature.id,
+        relationship_type: EntityLinkType.informs,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.work_item,
+        from_entity_id: routingDecision.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: kpi.id,
+        relationship_type: EntityLinkType.informs,
+      },
+    ],
   });
 
   await prisma.comment.create({

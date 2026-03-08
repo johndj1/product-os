@@ -64,6 +64,7 @@ Open `http://localhost:3000`.
 - `Product` is a first-class entity and context root.
 - `WorkItem` belongs to exactly one `Product`.
 - `WorkItem` supports parent-child relationships.
+- `EntityLink` is a generic, additive directional edge between `Product`, `WorkItem`, `Signal`, and `Page`.
 - `Page`, `Comment`, and `Signal` are scoped to a `Product`.
 - KPI measurement fields live on `WorkItem` when `type = kpi` (`current_value`, `target_value`, `unit`, `last_updated_at`).
 - Acceptance Criteria live on each `WorkItem` as `acceptance_criteria`.
@@ -101,6 +102,25 @@ Open `http://localhost:3000`.
 - `informs`
 - `impacts`
 
+`EntityType` values:
+
+- `product`
+- `work_item`
+- `signal`
+- `page`
+
+`EntityLinkType` values:
+
+- `measures`
+- `impacts`
+- `triggered_by`
+- `informs`
+- `supports`
+- `documents`
+- `references`
+- `relates_to`
+- `creates`
+
 Allowed hierarchy guardrails:
 
 - `outcome -> kpi`
@@ -112,7 +132,8 @@ Hierarchy vs relationships:
 
 - Hierarchy is the golden thread and uses parent-child WorkItem structure.
 - Relationships are directional graph edges between WorkItems and do not change hierarchy.
-- Use hierarchy for decomposition and relationships for traceability across strategy, delivery, and operations.
+- EntityLinks are additive directional edges for cross-entity traceability across Product, WorkItems, Signals, and Pages.
+- Use hierarchy for decomposition, WorkItem relationships for WorkItem-to-WorkItem traceability, and EntityLinks for cross-entity context.
 
 `SignalType` values:
 
@@ -145,6 +166,7 @@ Hierarchy vs relationships:
 - Acceptance Criteria on selected WorkItems (`Create Product overview page`, `Render golden-thread tree view`, `Signal ingestion foundation`)
 - Capability, Feature, Story, Task chain for delivery traceability
 - Seeded page, signal, and comment for workspace visibility
+- Seeded EntityLinks covering Product-to-KPI, Signal-to-KPI, Signal-to-WorkItem, Page-to-WorkItem, and Decision-to-WorkItem examples
 
 ## Routes
 
@@ -161,7 +183,9 @@ Hierarchy vs relationships:
 - Pages: use the form in `/products/[productId]/pages` (`title`, optional `body`, optional linked WorkItem).
 - Signals: use the form in `/products/[productId]/signals` (`title`, optional `description`, `signal type`, optional `severity`, optional linked WorkItem).
 - Relationships: use the form in `/products/[productId]/work` (`from WorkItem`, `relationship type`, `to WorkItem`).
+- EntityLinks: use the form in `/products/[productId]/work` (`from entity type`, `from entity`, `relationship type`, `to entity type`, `to entity`).
 - Each create flow validates on the server, then redirects back to the same view with success or error feedback.
+- EntityLink validation ensures both entities belong to the same Product and prevents exact duplicates.
 - WorkItem status can be updated from the Work hierarchy using the status selector on each row.
 - Comments: add WorkItem comments from `/products/[productId]/work/[workItemId]` (comment body required, default system author).
 
@@ -171,6 +195,7 @@ Hierarchy vs relationships:
 - Create Decisions from the dedicated "Create Decision" panel in `/products/[productId]/work`.
 - View Decision details at `/products/[productId]/work/[workItemId]`, including acceptance criteria, related WorkItems, related KPI links, related Signals, and comments.
 - Connect Decisions to delivery and strategy WorkItems using the Relationship create form in the Work view.
+- Cross-entity Decision context can also be captured with EntityLinks when the target is a `Signal`, `Page`, or Product-level KPI WorkItem.
 
 ## Completion Model (v1)
 

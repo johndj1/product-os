@@ -31,6 +31,19 @@ Full-Stack Product Owner
 
 Show how Product OS concepts (WorkItem, Relationship, Signal, KPI, Decision) can be documented for a real Product that is already implemented, while also reflecting that Product OS is still being actively developed as a platform.
 
+## How This Example Relates To Check-a-Train Onboarding
+
+This Product OS example is useful as a documentation and modelling reference, but it should not be mistaken for proof that Product OS is already ready for trusted production use.
+
+When onboarding Check-a-Train:
+
+- use this example to understand the shape of a Product expressed in Product OS terms
+- start Check-a-Train in Product OS dev as a pilot Product
+- keep the first graph intentionally small and operational
+- use the pilot to discover what Product OS still lacks before creating a stable personal prod environment
+
+For the practical staging guidance, see `docs/platform/operations/checkatrain-onboarding-and-environment-staging.md`.
+
 ## How To Use The Personas And Journeys
 
 Use the persona files to understand who operates Product OS, what evidence they respond to, and which Product OS objects they are responsible for keeping healthy. Use the journey files as realistic reference flows when designing new features, prompts, automations, or documentation updates, and keep proposed changes anchored to the implemented Product, WorkItem, Relationship, Signal, KPI, and Decision model rather than generic backlog tooling.

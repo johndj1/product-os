@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { EntityType } from "@prisma/client";
+import { getGroupedEntityLinksForEntity } from "@/lib/entity-links";
 import { calculatePriorityForWorkItem } from "@/lib/priority-scoring";
 import { prisma } from "@/lib/prisma";
 import { getRelationshipsForProduct } from "@/lib/relationships";
@@ -155,7 +157,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
             },
           },
         });
-  const [allWorkItems, relationships, signals] = await Promise.all([
+  const [allWorkItems, relationships, signals, entityLinkData] = await Promise.all([
     prisma.workItem.findMany({
       where: { product_id: productId },
       select: {
@@ -175,6 +177,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
         severity: true,
       },
     }),
+    getGroupedEntityLinksForEntity(prisma, productId, EntityType.work_item, workItemId),
   ]);
 
   const priority = calculatePriorityForWorkItem(
@@ -189,6 +192,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
     relationships,
     signals,
   );
+  const workItemEntityLinks = entityLinkData.grouped[`work_item:${workItemId}`] ?? { outgoing: [], incoming: [] };
 
   return (
     <section className="grid gap-4">
@@ -317,6 +321,46 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
                       {child.type} - {child.status}
                     </p>
                   </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <article className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Outgoing EntityLinks</h3>
+          {workItemEntityLinks.outgoing.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">No outgoing EntityLinks.</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {workItemEntityLinks.outgoing.map((link) => (
+                <li key={link.id} className="rounded-md border border-slate-100 p-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">{link.relationshipType}</p>
+                  <Link href={link.toEntity.href} className="mt-1 block font-medium text-slate-900 hover:underline">
+                    {link.toEntity.title}
+                  </Link>
+                  <p className="mt-1 text-xs text-slate-500">{link.toEntity.meta}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+
+        <article className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Incoming EntityLinks</h3>
+          {workItemEntityLinks.incoming.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">No incoming EntityLinks.</p>
+          ) : (
+            <ul className="mt-2 space-y-2">
+              {workItemEntityLinks.incoming.map((link) => (
+                <li key={link.id} className="rounded-md border border-slate-100 p-3">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">{link.relationshipType}</p>
+                  <Link href={link.fromEntity.href} className="mt-1 block font-medium text-slate-900 hover:underline">
+                    {link.fromEntity.title}
+                  </Link>
+                  <p className="mt-1 text-xs text-slate-500">{link.fromEntity.meta}</p>
                 </li>
               ))}
             </ul>

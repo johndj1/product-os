@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { EntityType } from "@prisma/client";
+import { getEntityLinksForEntity, getEntityLinksForProduct } from "@/lib/entity-links";
 import { prisma } from "@/lib/prisma";
 import { buildWorkItemTree, WorkItemTreeNode } from "@/lib/product-workspace";
 
@@ -74,7 +76,7 @@ export default async function ProductOverviewPage({ params }: OverviewPageProps)
     notFound();
   }
 
-  const [kpis, workItems, recentDecisions, recentWorkItems, recentSignals, recentPages, recentComments] = await Promise.all([
+  const [kpis, workItems, recentDecisions, recentWorkItems, recentSignals, recentPages, recentComments, productEntityLinks, recentEntityLinks] = await Promise.all([
     prisma.workItem.findMany({
       where: {
         product_id: productId,
@@ -129,9 +131,12 @@ export default async function ProductOverviewPage({ params }: OverviewPageProps)
       take: 2,
       select: { id: true, body: true, updated_at: true },
     }),
+    getEntityLinksForEntity(prisma, productId, EntityType.product, productId),
+    getEntityLinksForProduct(prisma, productId),
   ]);
 
   const tree = buildWorkItemTree(workItems);
+  const latestEntityLinks = recentEntityLinks.slice(0, 5);
 
   const recentActivity = [
     ...recentWorkItems.map((item) => ({
@@ -246,6 +251,49 @@ export default async function ProductOverviewPage({ params }: OverviewPageProps)
                 <li key={item.id} className="rounded-md border border-slate-100 p-3">
                   <p className="text-sm text-slate-900">{item.label}</p>
                   <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">{item.type}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <article className="rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="text-lg font-semibold text-slate-900">Product EntityLinks</h2>
+          {productEntityLinks.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">No Product-level EntityLinks yet.</p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {productEntityLinks.map((link) => {
+                const counterpart = link.fromEntity.entityType === EntityType.product ? link.toEntity : link.fromEntity;
+
+                return (
+                  <li key={link.id} className="rounded-md border border-slate-100 p-3">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">{link.relationshipType}</p>
+                    <p className="mt-1 font-medium text-slate-900">{counterpart.title}</p>
+                    <p className="mt-1 text-xs text-slate-500">{counterpart.meta}</p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </article>
+
+        <article className="rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="text-lg font-semibold text-slate-900">Recent EntityLinks</h2>
+          {latestEntityLinks.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">No cross-entity links recorded yet.</p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {latestEntityLinks.map((link) => (
+                <li key={link.id} className="rounded-md border border-slate-100 p-3">
+                  <p className="text-sm text-slate-900">
+                    {link.fromEntity.title} {link.relationshipType} {link.toEntity.title}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {link.fromEntity.meta} {"->"} {link.toEntity.meta}
+                  </p>
                 </li>
               ))}
             </ul>

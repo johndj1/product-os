@@ -38,6 +38,25 @@ enum RelationshipType {
   impacts
 }
 
+enum EntityType {
+  product
+  work_item
+  signal
+  page
+}
+
+enum EntityLinkType {
+  measures
+  impacts
+  triggered_by
+  informs
+  supports
+  documents
+  references
+  relates_to
+  creates
+}
+
 enum SignalType {
   kpi_change
   customer_feedback
@@ -78,6 +97,7 @@ model Product {
   comments       Comment[]
   signals        Signal[]
   relationships  Relationship[]
+  entity_links   EntityLink[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -126,6 +146,27 @@ model WorkItem {
   @@index([parent_id])
   @@index([product_id])
   @@map("work_items")
+}
+
+model EntityLink {
+  id               String         @id @default(uuid())
+  product_id       String
+  from_entity_type EntityType
+  from_entity_id   String
+  to_entity_type   EntityType
+  to_entity_id     String
+  relationship_type EntityLinkType
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([product_id])
+  @@index([from_entity_type, from_entity_id])
+  @@index([to_entity_type, to_entity_id])
+  @@unique([product_id, from_entity_type, from_entity_id, to_entity_type, to_entity_id, relationship_type])
+  @@map("entity_links")
 }
 
 model Relationship {

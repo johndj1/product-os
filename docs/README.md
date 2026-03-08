@@ -22,7 +22,8 @@ Describes the implemented Product OS platform:
 Key operations guidance:
 
 - `docs/platform/operations/local-development.md`: local setup and baseline verification
-- `docs/platform/operations/environment-strategy.md`: how to separate Product OS development use, pilot use, and future trusted production use
+- `docs/platform/operations/environment-strategy.md`: how to separate Product OS dev, stable personal prod, and a later shared/public direction
+- `docs/platform/operations/checkatrain-onboarding-and-environment-staging.md`: practical Check-a-Train onboarding path and environment staging guidance
 
 ### 2) Product Model (`docs/product-model`)
 
@@ -53,6 +54,8 @@ Worked examples that apply the templates in practice.
 3. Define Signals, KPIs, and decisions.
 4. Add architecture documentation.
 5. Keep mappings explicit to Product, WorkItem, Relationship, Signal, KPI, and Decision.
+
+For the first serious pilot Product onboarding, also review `docs/platform/operations/checkatrain-onboarding-and-environment-staging.md` before attempting a full migration from existing tooling.
 
 ## Suggested Reading For Personas And Journeys
 
