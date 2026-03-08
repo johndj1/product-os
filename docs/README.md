@@ -28,8 +28,17 @@ Key operations guidance:
 
 Reusable templates and guidance for documenting any Product managed in Product OS.
 
-- `templates/`: copy-ready templates for PDD, persona, journey, KPI, decision, architecture
+- `templates/`: copy-ready templates for Product PDD, persona, customer journey, Signal, KPI, decision, and architecture documentation
 - `guidance/`: principles and usage guidance
+
+Product-model templates currently include:
+
+- Product PDD templates
+- Persona templates
+- Customer journeys
+- Signal templates
+- KPI templates
+- Decision templates
 
 ### 3) Product Examples (`docs/product-examples`)
 
@@ -41,7 +50,7 @@ Worked examples that apply the templates in practice.
 
 1. Create Product PDD from `docs/product-model/templates/product-pdd-template.md`.
 2. Add personas and journeys using the matching templates.
-3. Define KPIs and decisions.
+3. Define Signals, KPIs, and decisions.
 4. Add architecture documentation.
 5. Keep mappings explicit to Product, WorkItem, Relationship, Signal, KPI, and Decision.
 
