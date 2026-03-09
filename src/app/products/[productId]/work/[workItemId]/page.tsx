@@ -19,6 +19,8 @@ const detailMessages: Record<string, string> = {
   comment_created: "Comment added.",
   comment_body_required: "Comment body is required.",
   workitem_not_found: "WorkItem not found for this Product.",
+  feature_decomposition_created: "Suggested Stories and Tasks created for this Feature.",
+  feature_decomposition_invalid: "Feature decomposition is only available once per Feature and requires a Feature WorkItem.",
 };
 
 function getKpiProgressPercent(currentValue: number | null, targetValue: number | null): number | null {
@@ -202,6 +204,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
   const workItemEntityLinks = entityLinkData.grouped[`work_item:${workItemId}`] ?? { outgoing: [], incoming: [] };
   const reusedSignalCount = workItem.signals.filter((signal) => signal.routing_note?.includes("existing active")).length;
   const usagePatternSignals = workItem.signals.filter((signal) => asObject(signal.payload)?.usagePattern);
+  const storyChildren = workItem.children.filter((child) => child.type === "story");
   const now = new Date();
 
   return (
@@ -260,6 +263,24 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
               )}
             </div>
           </div>
+        </article>
+      ) : null}
+
+      {workItem.type === "feature" ? (
+        <article className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Feature Decomposition</h3>
+          <p className="mt-2 text-sm text-slate-600">Generate a first-pass Story and Task breakdown that the builder can review and adjust before handing Tasks to Codex.</p>
+          {storyChildren.length > 0 ? (
+            <p className="mt-3 text-sm text-slate-700">
+              This Feature already has {storyChildren.length} Story child{storyChildren.length === 1 ? "" : "ren"}, so automatic decomposition is locked to avoid duplicate work.
+            </p>
+          ) : (
+            <form action={`/products/${productId}/work/${workItem.id}/decompose`} method="post" className="mt-3">
+              <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                Generate Stories and Tasks
+              </button>
+            </form>
+          )}
         </article>
       ) : null}
 

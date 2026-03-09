@@ -19,6 +19,7 @@ type WorkPageProps = {
 
 const workMessages: Record<string, string> = {
   workitem_created: "WorkItem created.",
+  feature_decomposition_created: "Feature created with suggested Stories and Tasks.",
   workitem_status_updated: "WorkItem status updated.",
   relationship_created: "Relationship created.",
   workitem_title_required: "Title is required.",
@@ -27,6 +28,7 @@ const workMessages: Record<string, string> = {
   workitem_not_found: "WorkItem not found for this Product.",
   workitem_parent_not_found: "Selected parent WorkItem was not found for this Product.",
   workitem_parent_type_invalid: "Selected parent is not allowed for this WorkItem type.",
+  feature_decomposition_invalid: "Feature decomposition is only available once per Feature and requires a Feature WorkItem.",
   relationship_workitems_required: "From and To WorkItems are required.",
   relationship_workitems_invalid: "Selected WorkItems must belong to this Product.",
   relationship_self_link_not_allowed: "A WorkItem cannot link to itself.",

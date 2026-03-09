@@ -130,6 +130,21 @@ export default function WorkItemCreateForm({ productId, parentOptions }: WorkIte
         </div>
       </div>
 
+      {selectedType === "feature" ? (
+        <label className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            name="generate_decomposition"
+            value="true"
+            defaultChecked
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900"
+          />
+          <span>
+            Automatically generate suggested Stories and Tasks for this Feature.
+          </span>
+        </label>
+      ) : null}
+
       <button type="submit" className="w-fit rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
         Create WorkItem
       </button>

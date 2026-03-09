@@ -1,5 +1,6 @@
 import { WorkItemStatus, WorkItemType } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { createFeatureDecompositionWorkItems, FeatureDecompositionError } from "@/lib/feature-decomposition-work-items";
 import { prisma } from "@/lib/prisma";
 import { assertAllowedChildType } from "@/lib/work-item-hierarchy";
 import { WORK_ITEM_STATUS_VALUES, WORK_ITEM_TYPE_VALUES } from "@/lib/work-item-rules";
@@ -18,6 +19,7 @@ export async function POST(request: Request, context: RouteContext) {
   const typeRaw = String(formData.get("type") ?? "").trim();
   const statusRaw = String(formData.get("status") ?? "").trim();
   const parentIdRaw = String(formData.get("parent_id") ?? "").trim();
+  const shouldGenerateDecomposition = String(formData.get("generate_decomposition") ?? "").trim() === "true";
 
   if (!title) {
     return NextResponse.redirect(new URL(`/products/${productId}/work?error=workitem_title_required`, request.url));
@@ -54,17 +56,38 @@ export async function POST(request: Request, context: RouteContext) {
     parentId = parent.id;
   }
 
-  await prisma.workItem.create({
-    data: {
-      title,
-      description: description || null,
-      acceptance_criteria: acceptanceCriteria || null,
-      type,
-      status,
-      parent_id: parentId,
-      product_id: productId,
-    },
-  });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const createdWorkItem = await tx.workItem.create({
+        data: {
+          title,
+          description: description || null,
+          acceptance_criteria: acceptanceCriteria || null,
+          type,
+          status,
+          parent_id: parentId,
+          product_id: productId,
+        },
+      });
 
-  return NextResponse.redirect(new URL(`/products/${productId}/work?success=workitem_created`, request.url));
+      if (type === "feature" && shouldGenerateDecomposition) {
+        await createFeatureDecompositionWorkItems(tx, {
+          id: createdWorkItem.id,
+          title: createdWorkItem.title,
+          description: createdWorkItem.description,
+          product_id: createdWorkItem.product_id,
+          type: createdWorkItem.type,
+        });
+      }
+    });
+  } catch (error) {
+    if (error instanceof FeatureDecompositionError) {
+      return NextResponse.redirect(new URL(`/products/${productId}/work?error=feature_decomposition_invalid`, request.url));
+    }
+
+    throw error;
+  }
+
+  const successCode = type === "feature" && shouldGenerateDecomposition ? "feature_decomposition_created" : "workitem_created";
+  return NextResponse.redirect(new URL(`/products/${productId}/work?success=${successCode}`, request.url));
 }
