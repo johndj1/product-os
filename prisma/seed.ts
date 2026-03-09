@@ -688,6 +688,20 @@ async function seedCheckATrain(systemUserId: string) {
     createdBy: systemUserId,
   });
 
+  const emitProviderHealthHeartbeatWithoutAdditionalDarwinTraffic =
+    await createWorkItem({
+      title: "Emit provider health heartbeat without generating additional Darwin traffic",
+      type: WorkItemType.story,
+      status: WorkItemStatus.new,
+      description:
+        "Lower-priority follow-up work to summarise Darwin provider health from real observed traffic only, after the current real event signal work is in place. The heartbeat should avoid synthetic Darwin requests, track rolling or periodic success and failure counters, last success and failure timestamps, and error-type counts, and eventually emit a provider_health_snapshot Signal into Product OS.",
+      acceptanceCriteria:
+        "- Provider health is summarised from already-observed live traffic only\n- No synthetic Darwin requests are generated for heartbeat purposes\n- Rolling or periodic counts exist for successes, failures, last success and failure timestamps, and error-type breakdowns\n- A provider_health_snapshot Signal shape is defined for eventual emission into Product OS\n- This backlog item remains lower priority than current real usage signal and repeated failure handling work",
+      parentId: providerFailureHandlingAndServiceResilience.id,
+      productId: product.id,
+      createdBy: systemUserId,
+    });
+
   const classifyDarwinFailureTypesAndSeverity = await createWorkItem({
     title: "Classify Darwin failure types and severity",
     type: WorkItemType.task,
@@ -742,6 +756,52 @@ async function seedCheckATrain(systemUserId: string) {
     productId: product.id,
     createdBy: systemUserId,
   });
+
+  const defineInAppDarwinSuccessFailureCounters = await createWorkItem({
+    title: "Define in-app Darwin success/failure counters",
+    type: WorkItemType.task,
+    status: WorkItemStatus.new,
+    description:
+      "Define the rolling or periodic counters, timestamps, and retention window needed to summarise provider health from real lookup traffic without adding synthetic requests.",
+    parentId: emitProviderHealthHeartbeatWithoutAdditionalDarwinTraffic.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const defineProviderHealthSnapshotSignalShape = await createWorkItem({
+    title: "Define provider health snapshot signal shape",
+    type: WorkItemType.task,
+    status: WorkItemStatus.new,
+    description:
+      "Specify the provider_health_snapshot Signal payload so Product OS can interpret provider, window, success and failure counts, latest success and failure timestamps, and grouped error-type counts.",
+    parentId: emitProviderHealthHeartbeatWithoutAdditionalDarwinTraffic.id,
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
+  const emitPeriodicProviderHealthSnapshotFromObservedTrafficOnly =
+    await createWorkItem({
+      title: "Emit periodic provider health snapshot from observed traffic only",
+      type: WorkItemType.task,
+      status: WorkItemStatus.new,
+      description:
+        "Plan the eventual periodic emission of provider health snapshots using only already-observed Darwin traffic, with no synthetic requests created purely to check provider availability.",
+      parentId: emitProviderHealthHeartbeatWithoutAdditionalDarwinTraffic.id,
+      productId: product.id,
+      createdBy: systemUserId,
+    });
+
+  const routeProviderHealthSnapshotIntoProductOsTaxonomy =
+    await createWorkItem({
+      title: "Route provider health snapshot into Product OS taxonomy",
+      type: WorkItemType.task,
+      status: WorkItemStatus.new,
+      description:
+        "Map the future provider_health_snapshot Signal into the Product OS signal taxonomy so heartbeat summaries can be reviewed alongside real failure Signals without displacing higher-priority work.",
+      parentId: emitProviderHealthHeartbeatWithoutAdditionalDarwinTraffic.id,
+      productId: product.id,
+      createdBy: systemUserId,
+    });
 
   const investigateRepeatedDarwinFailures = await createWorkItem({
     title: "Investigate repeated Darwin provider failures",
@@ -1041,7 +1101,7 @@ async function seedCheckATrain(systemUserId: string) {
   const providerResilienceNotesPage = await prisma.page.create({
     data: {
       title: "Check-a-Train provider resilience notes",
-      body: "Provider failures should be observable in Product OS, handled gracefully in the user journey, and escalated into investigation only when repeated enough to indicate a meaningful operating problem.",
+      body: "Provider failures should be observable in Product OS, handled gracefully in the user journey, and escalated into investigation only when repeated enough to indicate a meaningful operating problem. A lower-priority follow-up is to summarise provider health from real observed traffic only, without generating synthetic Darwin requests, and eventually emit a provider_health_snapshot Signal when that work becomes worth prioritising.",
       product_id: product.id,
       work_item_id: providerFailureHandlingAndServiceResilience.id,
       author_id: systemUserId,
@@ -1242,6 +1302,14 @@ async function seedCheckATrain(systemUserId: string) {
         from_entity_id: providerResilienceNotesPage.id,
         to_entity_type: EntityType.work_item,
         to_entity_id: providerFailureHandlingAndServiceResilience.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: providerResilienceNotesPage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: emitProviderHealthHeartbeatWithoutAdditionalDarwinTraffic.id,
         relationship_type: EntityLinkType.documents,
       },
       {
