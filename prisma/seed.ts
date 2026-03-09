@@ -27,6 +27,7 @@ type CreateWorkItemInput = {
   lastUpdatedAt?: Date;
   parentId?: string;
   productId: string;
+  outcomeId?: string;
   createdBy?: string;
 };
 
@@ -47,6 +48,12 @@ type CreateJourneyInput = {
   productId: string;
   personaIds?: string[];
   steps: CreateJourneyStepInput[];
+};
+
+type CreateOutcomeInput = {
+  journeyStepId: string;
+  title: string;
+  description?: string;
 };
 
 async function createWorkItem(input: CreateWorkItemInput) {
@@ -71,6 +78,7 @@ async function createWorkItem(input: CreateWorkItemInput) {
       last_updated_at: input.lastUpdatedAt,
       parent_id: input.parentId,
       product_id: input.productId,
+      outcome_id: input.outcomeId,
       created_by: input.createdBy,
     },
   });
@@ -171,6 +179,11 @@ async function createJourney(input: CreateJourneyInput) {
 
     return prisma.journey.findUniqueOrThrow({
       where: { id: existingJourney.id },
+      include: {
+        steps: {
+          orderBy: { step_order: "asc" },
+        },
+      },
     });
   }
 
@@ -193,6 +206,40 @@ async function createJourney(input: CreateJourneyInput) {
           description: step.description,
         })),
       },
+    },
+    include: {
+      steps: {
+        orderBy: { step_order: "asc" },
+      },
+    },
+  });
+}
+
+async function createOutcome(input: CreateOutcomeInput) {
+  const existingOutcome = await prisma.outcome.findUnique({
+    where: {
+      journey_step_id_title: {
+        journey_step_id: input.journeyStepId,
+        title: input.title,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (existingOutcome) {
+    return prisma.outcome.update({
+      where: { id: existingOutcome.id },
+      data: {
+        description: input.description,
+      },
+    });
+  }
+
+  return prisma.outcome.create({
+    data: {
+      journey_step_id: input.journeyStepId,
+      title: input.title,
+      description: input.description,
     },
   });
 }
@@ -426,6 +473,16 @@ async function seedProductOS(systemUserId: string) {
     createdBy: systemUserId,
   });
 
+  const outcomeDrivenHierarchyDecision = await createWorkItem({
+    title: "Decision: Product OS uses outcome-driven hierarchy",
+    type: WorkItemType.decision,
+    status: WorkItemStatus.done,
+    description:
+      "All work in Product OS must follow the hierarchy:\n\nProduct\n-> Persona\n-> Journey\n-> Journey Step\n-> Outcome\n-> Feature\n-> Story\n-> Task\n\nFeatures must map to Outcomes.\nStories must map to Features.\nTasks must map to Stories.\n\nWork that cannot be linked to a Journey Step Outcome should not be created.",
+    productId: product.id,
+    createdBy: systemUserId,
+  });
+
   await prisma.relationship.createMany({
     data: [
       {
@@ -513,6 +570,16 @@ async function seedProductOS(systemUserId: string) {
     },
   });
 
+  const outcomePrinciplePage = await prisma.page.create({
+    data: {
+      title: "Principle: Build only for customer outcomes",
+      body:
+        "Product OS prioritises improving customer journeys.\n\nEvery Feature must support a defined Outcome.\nEvery Story must support a Feature.\nEvery Task must support a Story.\n\nThis ensures development activity remains aligned to customer value.",
+      product_id: product.id,
+      author_id: systemUserId,
+    },
+  });
+
   const ingestionHeartbeatSignal = await prisma.signal.create({
     data: {
       title: "First ingestion heartbeat",
@@ -592,6 +659,14 @@ async function seedProductOS(systemUserId: string) {
       },
       {
         product_id: product.id,
+        from_entity_type: EntityType.page,
+        from_entity_id: outcomePrinciplePage.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: outcomeDrivenHierarchyDecision.id,
+        relationship_type: EntityLinkType.documents,
+      },
+      {
+        product_id: product.id,
         from_entity_type: EntityType.work_item,
         from_entity_id: routingDecision.id,
         to_entity_type: EntityType.work_item,
@@ -604,6 +679,14 @@ async function seedProductOS(systemUserId: string) {
         from_entity_id: routingDecision.id,
         to_entity_type: EntityType.work_item,
         to_entity_id: kpi.id,
+        relationship_type: EntityLinkType.informs,
+      },
+      {
+        product_id: product.id,
+        from_entity_type: EntityType.work_item,
+        from_entity_id: outcomeDrivenHierarchyDecision.id,
+        to_entity_type: EntityType.work_item,
+        to_entity_id: canonicalDomainFeature.id,
         relationship_type: EntityLinkType.informs,
       },
     ],
@@ -657,7 +740,7 @@ async function seedCheckATrain(systemUserId: string) {
     productId: product.id,
   });
 
-  await createJourney({
+  const claimCompensationJourney = await createJourney({
     title: "Claim compensation for a delayed train",
     description:
       "The user discovers a delay, checks the journey details, determines Delay Repay eligibility, and starts a compensation claim with the correct operator.",
@@ -686,6 +769,34 @@ async function seedCheckATrain(systemUserId: string) {
         description: "User begins the operator compensation process.",
       },
     ],
+  });
+
+  const journeyStepsByTitle = new Map(
+    claimCompensationJourney.steps.map((step) => [step.title, step]),
+  );
+
+  await createOutcome({
+    journeyStepId: journeyStepsByTitle.get("Discover delay")!.id,
+    title: "User can quickly identify whether their train is delayed.",
+    description: "Enable a fast first check so the user can confirm disruption without interpreting multiple data sources manually.",
+  });
+
+  const checkDelayDetailsOutcome = await createOutcome({
+    journeyStepId: journeyStepsByTitle.get("Check delay details")!.id,
+    title: "User can view accurate delay information for their train.",
+    description: "Expose reliable service status and timing detail so the user can understand what is happening to the journey.",
+  });
+
+  const determineEligibilityOutcome = await createOutcome({
+    journeyStepId: journeyStepsByTitle.get("Determine eligibility")!.id,
+    title: "User understands whether their journey qualifies for Delay Repay.",
+    description: "Explain likely eligibility from journey evidence clearly enough that the user knows whether to continue to a claim.",
+  });
+
+  const startClaimOutcome = await createOutcome({
+    journeyStepId: journeyStepsByTitle.get("Start claim")!.id,
+    title: "User can quickly start the correct compensation claim.",
+    description: "Route the user into the right operator claim path with the minimum next-step friction.",
   });
 
   const outcome = await createWorkItem({
@@ -741,6 +852,7 @@ async function seedCheckATrain(systemUserId: string) {
     status: WorkItemStatus.in_progress,
     description: "Surface likely Delay Repay eligibility from live train running data before the user has to interpret station boards manually.",
     productId: product.id,
+    outcomeId: determineEligibilityOutcome.id,
     createdBy: systemUserId,
   });
 
@@ -750,6 +862,7 @@ async function seedCheckATrain(systemUserId: string) {
     status: WorkItemStatus.ready,
     description: "Guide the user from detected delay into the correct operator claim path with the minimum next-step friction.",
     productId: product.id,
+    outcomeId: startClaimOutcome.id,
     createdBy: systemUserId,
   });
 
@@ -761,6 +874,7 @@ async function seedCheckATrain(systemUserId: string) {
     acceptanceCriteria:
       "- Darwin calls required for live service lookup are defined\n- Service status and timing data are normalised into stable domain shapes\n- Failure and partial data paths are handled explicitly",
     productId: product.id,
+    outcomeId: checkDelayDetailsOutcome.id,
     createdBy: systemUserId,
   });
 
@@ -848,6 +962,7 @@ async function seedCheckATrain(systemUserId: string) {
     acceptanceCriteria:
       "- A single provider failure is observable without creating immediate backlog noise\n- Live-data lookup failures show a graceful retry path to the user\n- Structured provider failure signals can be traced in Product OS\n- Repeated provider failures can be escalated into investigation work using a defined threshold",
     productId: product.id,
+    outcomeId: checkDelayDetailsOutcome.id,
     createdBy: systemUserId,
   });
 
@@ -1020,6 +1135,7 @@ async function seedCheckATrain(systemUserId: string) {
     acceptanceCriteria:
       "- Practical how-to and glossary content exists for Check-a-Train and Product OS usage\n- Product-level pages are linked to the relevant WorkItems\n- Architecture and operating notes cover current MVP assumptions",
     productId: product.id,
+    outcomeId: startClaimOutcome.id,
     createdBy: systemUserId,
   });
 
@@ -1577,6 +1693,7 @@ async function main() {
   await prisma.signal.deleteMany();
   await prisma.entityLink.deleteMany();
   await prisma.personaJourney.deleteMany();
+  await prisma.outcome.deleteMany();
   await prisma.journeyStep.deleteMany();
   await prisma.journey.deleteMany();
   await prisma.persona.deleteMany();

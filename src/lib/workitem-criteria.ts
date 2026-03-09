@@ -11,6 +11,7 @@ type WorkItemContext = {
     parent?: {
       type: WorkItemType;
       title: string;
+      description?: string | null;
     } | null;
   } | null;
 };
@@ -41,6 +42,7 @@ function toContextText(context: WorkItemContext): string {
     context.parent?.title,
     context.parent?.description,
     context.parent?.parent?.title,
+    context.parent?.parent?.description,
   )
     .join(" ")
     .toLowerCase();

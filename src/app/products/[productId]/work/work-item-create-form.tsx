@@ -9,12 +9,20 @@ type WorkParentOption = {
   type: WorkItemTypeValue;
 };
 
+type OutcomeOption = {
+  id: string;
+  title: string;
+  journeyTitle: string;
+  journeyStepTitle: string;
+};
+
 type WorkItemCreateFormProps = {
   productId: string;
   parentOptions: WorkParentOption[];
+  outcomeOptions: OutcomeOption[];
 };
 
-export default function WorkItemCreateForm({ productId, parentOptions }: WorkItemCreateFormProps) {
+export default function WorkItemCreateForm({ productId, parentOptions, outcomeOptions }: WorkItemCreateFormProps) {
   const [selectedType, setSelectedType] = useState<WorkItemTypeValue>("outcome");
 
   const allowedParentTypes = useMemo(() => {
@@ -131,6 +139,36 @@ export default function WorkItemCreateForm({ productId, parentOptions }: WorkIte
             <p className="mt-1 text-xs text-slate-500">This type can only be created as a root WorkItem in v1 guardrails.</p>
           ) : null}
         </div>
+      </div>
+
+      <div>
+        <label htmlFor="outcome_id" className="mb-1 block text-sm font-medium text-slate-700">
+          Outcome {selectedType === "feature" ? "(required)" : "(optional)"}
+        </label>
+        <select
+          id="outcome_id"
+          name="outcome_id"
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+          defaultValue=""
+          disabled={selectedType !== "feature" || outcomeOptions.length === 0}
+          required={selectedType === "feature"}
+        >
+          <option value="">
+            {selectedType === "feature" ? "Select journey outcome" : "Outcome linkage only applies to Features here"}
+          </option>
+          {outcomeOptions.map((outcome) => (
+            <option key={outcome.id} value={outcome.id}>
+              {outcome.journeyTitle} / {outcome.journeyStepTitle} / {outcome.title}
+            </option>
+          ))}
+        </select>
+        {selectedType === "feature" ? (
+          outcomeOptions.length > 0 ? (
+            <p className="mt-1 text-xs text-slate-500">Every Feature must support a customer Outcome for this Product.</p>
+          ) : (
+            <p className="mt-1 text-xs text-rose-600">No Outcomes exist for this Product yet. Create journey Outcomes before adding Features.</p>
+          )
+        ) : null}
       </div>
 
       {selectedType === "feature" ? (

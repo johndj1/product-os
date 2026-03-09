@@ -28,6 +28,8 @@ const workMessages: Record<string, string> = {
   workitem_not_found: "WorkItem not found for this Product.",
   workitem_parent_not_found: "Selected parent WorkItem was not found for this Product.",
   workitem_parent_type_invalid: "Selected parent is not allowed for this WorkItem type.",
+  workitem_feature_outcome_required: "Features must be linked to an Outcome.",
+  workitem_feature_outcome_invalid: "Selected Outcome was not found for this Product.",
   feature_decomposition_invalid: "Feature decomposition is only available once per Feature and requires a Feature WorkItem.",
   relationship_workitems_required: "From and To WorkItems are required.",
   relationship_workitems_invalid: "Selected WorkItems must belong to this Product.",
@@ -173,10 +175,48 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
     notFound();
   }
 
-  const [workItems, relationships, signals, entityLinkData, entityOptions] = await Promise.all([
+  const [workItems, outcomes, relationships, signals, entityLinkData, entityOptions] = await Promise.all([
     prisma.workItem.findMany({
       where: { product_id: productId },
       orderBy: [{ created_at: "asc" }],
+    }),
+    prisma.outcome.findMany({
+      where: {
+        journey_step: {
+          journey: {
+            product_id: productId,
+          },
+        },
+      },
+      orderBy: [
+        {
+          journey_step: {
+            journey: {
+              title: "asc",
+            },
+          },
+        },
+        {
+          journey_step: {
+            step_order: "asc",
+          },
+        },
+        { title: "asc" },
+      ],
+      select: {
+        id: true,
+        title: true,
+        journey_step: {
+          select: {
+            title: true,
+            journey: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        },
+      },
     }),
     getRelationshipsForProduct(prisma, productId),
     prisma.signal.findMany({
@@ -201,6 +241,12 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
     id: item.id,
     title: item.title,
     type: item.type as WorkItemTypeValue,
+  }));
+  const outcomeOptions = outcomes.map((outcome) => ({
+    id: outcome.id,
+    title: outcome.title,
+    journeyTitle: outcome.journey_step.journey.title,
+    journeyStepTitle: outcome.journey_step.title,
   }));
 
   const { outgoingByWorkItem, incomingByWorkItem } = groupRelationshipsByWorkItem(relationships);
@@ -230,7 +276,7 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
       <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Create WorkItem</h3>
         <div className="mt-3">
-          <WorkItemCreateForm productId={productId} parentOptions={parentOptions} />
+          <WorkItemCreateForm productId={productId} parentOptions={parentOptions} outcomeOptions={outcomeOptions} />
         </div>
       </article>
 

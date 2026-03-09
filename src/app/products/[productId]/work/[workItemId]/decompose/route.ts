@@ -20,6 +20,21 @@ export async function POST(request: Request, context: RouteContext) {
       description: true,
       product_id: true,
       type: true,
+      outcome: {
+        select: {
+          title: true,
+          journey_step: {
+            select: {
+              title: true,
+              journey: {
+                select: {
+                  title: true,
+                },
+              },
+            },
+          },
+        },
+      },
     },
   });
 

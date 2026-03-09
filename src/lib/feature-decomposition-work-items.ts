@@ -14,6 +14,15 @@ export async function createFeatureDecompositionWorkItems(
     description: string | null;
     product_id: string;
     type: WorkItemType;
+    outcome?: {
+      title: string;
+      journey_step: {
+        title: string;
+        journey: {
+          title: string;
+        };
+      };
+    } | null;
   },
 ) {
   if (feature.type !== "feature") {
@@ -32,6 +41,17 @@ export async function createFeatureDecompositionWorkItems(
   }
 
   const decomposition = generateFeatureDecomposition(feature.title, feature.description);
+  const outcomeContext = feature.outcome
+    ? [
+        `Customer journey step: ${feature.outcome.journey_step.title}`,
+        "",
+        `Desired user outcome: ${feature.outcome.title}`,
+        "",
+        "Implementation notes:",
+        `- Journey: ${feature.outcome.journey_step.journey.title}`,
+        "- This work exists to improve the linked customer outcome for the parent Feature.",
+      ].join("\n")
+    : null;
 
   for (const story of decomposition.stories) {
     const storyContent = generateWorkItemContent({
@@ -45,11 +65,12 @@ export async function createFeatureDecompositionWorkItems(
         parent: null,
       },
     });
+    const storyDescription = [storyContent.description, outcomeContext].filter(Boolean).join("\n\n");
 
     const createdStory = await prismaClient.workItem.create({
       data: {
         title: story.title,
-        description: storyContent.description,
+        description: storyDescription,
         acceptance_criteria: storyContent.acceptanceCriteria,
         type: "story",
         status: WorkItemStatus.new,
@@ -71,10 +92,11 @@ export async function createFeatureDecompositionWorkItems(
           parent: {
             type: "story",
             title: story.title,
-            description: storyContent.description,
+            description: storyDescription,
             parent: {
               type: feature.type,
               title: feature.title,
+              description: feature.description,
             },
           },
         });

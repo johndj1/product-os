@@ -109,6 +109,8 @@ model Product {
   description String?
   definition_of_done String?
 
+  personas       Persona[]
+  journeys       Journey[]
   work_items     WorkItem[]
   pages          Page[]
   comments       Comment[]
@@ -120,6 +122,89 @@ model Product {
   updated_at DateTime @updatedAt
 
   @@map("products")
+}
+
+model Persona {
+  id          String @id @default(uuid())
+  product_id  String
+  name        String
+  description String?
+
+  product          Product          @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  persona_journeys PersonaJourney[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([product_id])
+  @@map("personas")
+}
+
+model Journey {
+  id          String @id @default(uuid())
+  product_id  String
+  title       String
+  description String?
+
+  product          Product          @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  persona_journeys PersonaJourney[]
+  steps            JourneyStep[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([product_id])
+  @@map("journeys")
+}
+
+model JourneyStep {
+  id          String @id @default(uuid())
+  journey_id  String
+  title       String
+  description String?
+  step_order  Int
+
+  journey  Journey   @relation(fields: [journey_id], references: [id], onDelete: Cascade)
+  outcomes Outcome[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([journey_id])
+  @@unique([journey_id, step_order])
+  @@map("journey_steps")
+}
+
+model Outcome {
+  id              String @id @default(uuid())
+  journey_step_id String
+  title           String
+  description     String?
+
+  journey_step JourneyStep @relation(fields: [journey_step_id], references: [id], onDelete: Cascade)
+
+  features WorkItem[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([journey_step_id])
+  @@unique([journey_step_id, title])
+  @@map("outcomes")
+}
+
+model PersonaJourney {
+  id         String @id @default(uuid())
+  persona_id String
+  journey_id String
+
+  persona Persona @relation(fields: [persona_id], references: [id], onDelete: Cascade)
+  journey Journey @relation(fields: [journey_id], references: [id], onDelete: Cascade)
+
+  @@index([persona_id])
+  @@index([journey_id])
+  @@unique([persona_id, journey_id])
+  @@map("persona_journeys")
 }
 
 model WorkItem {
@@ -137,13 +222,15 @@ model WorkItem {
   last_updated_at DateTime?
   parent_id   String?
   product_id  String
+  outcome_id  String?
   created_by  String?
   assignee_id String?
 
   parent   WorkItem?  @relation("WorkItemTree", fields: [parent_id], references: [id], onDelete: SetNull)
   children WorkItem[] @relation("WorkItemTree")
 
-  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  product Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  outcome Outcome? @relation(fields: [outcome_id], references: [id], onDelete: SetNull)
 
   creator  User? @relation("WorkItemCreator", fields: [created_by], references: [id], onDelete: SetNull)
   assignee User? @relation("WorkItemAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
@@ -162,6 +249,7 @@ model WorkItem {
   @@index([status])
   @@index([parent_id])
   @@index([product_id])
+  @@index([outcome_id])
   @@map("work_items")
 }
 

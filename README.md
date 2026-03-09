@@ -66,6 +66,8 @@ Open `http://localhost:3000`.
 - `WorkItem` supports parent-child relationships.
 - `EntityLink` is a generic, additive directional edge between `Product`, `WorkItem`, `Signal`, and `Page`.
 - `Page`, `Comment`, and `Signal` are scoped to a `Product`.
+- `Persona`, `Journey`, `JourneyStep`, and `Outcome` are first-class product-scoped entities for customer context and journey mapping.
+- Journey-derived delivery work is anchored by `Outcome`, and every new `feature` WorkItem must reference `outcome_id`.
 - KPI measurement fields live on `WorkItem` when `type = kpi` (`current_value`, `target_value`, `unit`, `last_updated_at`).
 - Acceptance Criteria live on each `WorkItem` as `acceptance_criteria`.
 - Priority scoring fields live on `WorkItem` as `priority_score` and `priority_reason`.
@@ -135,6 +137,24 @@ Hierarchy vs relationships:
 - EntityLinks are additive directional edges for cross-entity traceability across Product, WorkItems, Signals, and Pages.
 - Use hierarchy for decomposition, WorkItem relationships for WorkItem-to-WorkItem traceability, and EntityLinks for cross-entity context.
 
+## Outcome-Driven Hierarchy
+
+Product OS enforces the customer-to-delivery chain:
+
+- `Product`
+- `Persona`
+- `Journey`
+- `Journey Step`
+- `Outcome`
+- `Feature`
+- `Story`
+- `Task`
+
+All new delivery work should trace back to a customer `Outcome` derived from a `Journey Step`.
+`feature` WorkItems must point at an `Outcome` using `outcome_id`, and outcome selection now enforces that outcome-driven hierarchy during Feature creation. Downstream `story` and `task` WorkItems remain linked through the existing parent-child WorkItem hierarchy.
+
+Outcome Gap Detection uses that model to find journey outcomes with no supporting `feature` WorkItems and recommend the next feature title to add.
+
 `SignalType` values:
 
 - `kpi_change`
@@ -168,16 +188,52 @@ Seeded `Product OS` includes:
 - Acceptance Criteria on selected WorkItems (`Create Product overview page`, `Render golden-thread tree view`, `Signal ingestion foundation`)
 - Capability, Feature, Story, Task chain for delivery traceability
 - Seeded page, signal, and comment for workspace visibility
+- Seeded decision and principle content reinforcing the outcome-driven hierarchy
 - Seeded EntityLinks covering Product-to-KPI, Signal-to-KPI, Signal-to-WorkItem, Page-to-WorkItem, and Decision-to-WorkItem examples
 
 Seeded `Check-a-Train` includes:
 
 - Product baseline for the first serious pilot Product in Product OS dev
+- Four seeded personas: `Delayed commuter`, `Infrequent leisure traveller`, `Journey-complete claimant`, and `Mobile-first distracted user`
+- One seeded journey: `Claim compensation for a delayed train` with four steps (`Discover delay`, `Check delay details`, `Determine eligibility`, `Start claim`)
+- Four seeded journey-step Outcomes for the Check-a-Train claim journey
+- Outcome-to-Feature links for delay details, eligibility, and claim start, leaving outcome gaps detectable where support is still missing
 - One outcome, three KPI WorkItems, and a small MVP-oriented WorkItem graph
 - Decisions clarifying MVP focus around Delay Repay assistance and live-data-derived eligibility
 - Supporting pages for product definition, MVP scope, and architecture notes
 - A seeded KPI movement signal to exercise signal-driven follow-up work in the UI
 - Minimal Relationships and EntityLinks so the Product graph is meaningful without importing a full backlog
+
+## Verifying Seeded Personas And Journeys
+
+After `npm run db:push` and `npm run db:seed`, you can verify the new foundation data with Prisma Studio:
+
+```bash
+npx prisma studio
+```
+
+Open the `Persona`, `Journey`, `JourneyStep`, and `PersonaJourney` tables and confirm the Check-a-Train records exist.
+
+You can also open the `Outcome` table and confirm each Check-a-Train journey step has the expected seeded customer outcome.
+
+You can also verify from SQL:
+
+```sql
+select p.name
+from personas p
+join products pr on pr.id = p.product_id
+where pr.slug = 'check-a-train'
+order by p.name;
+```
+
+```sql
+select j.title, js.step_order, js.title as step_title
+from journeys j
+join products pr on pr.id = j.product_id
+join journey_steps js on js.journey_id = j.id
+where pr.slug = 'check-a-train'
+order by j.title, js.step_order;
+```
 
 ## Routes
 

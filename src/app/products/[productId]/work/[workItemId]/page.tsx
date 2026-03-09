@@ -122,6 +122,21 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
       target_value: true,
       unit: true,
       last_updated_at: true,
+      outcome: {
+        select: {
+          title: true,
+          journey_step: {
+            select: {
+              title: true,
+              journey: {
+                select: {
+                  title: true,
+                },
+              },
+            },
+          },
+        },
+      },
       product: {
         select: {
           name: true,
@@ -422,6 +437,30 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
               )}
             </div>
           </div>
+        </article>
+      ) : null}
+
+      {workItem.type === "feature" ? (
+        <article className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Linked Outcome</h3>
+          {workItem.outcome ? (
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-md border border-slate-100 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Outcome</p>
+                <p className="mt-1 text-sm text-slate-900">{workItem.outcome.title}</p>
+              </div>
+              <div className="rounded-md border border-slate-100 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Journey Step</p>
+                <p className="mt-1 text-sm text-slate-900">{workItem.outcome.journey_step.title}</p>
+              </div>
+              <div className="rounded-md border border-slate-100 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Journey</p>
+                <p className="mt-1 text-sm text-slate-900">{workItem.outcome.journey_step.journey.title}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-rose-700">This Feature has no linked Outcome. Linkage is required for newly created Features.</p>
+          )}
         </article>
       ) : null}
 

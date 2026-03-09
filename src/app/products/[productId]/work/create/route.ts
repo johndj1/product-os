@@ -19,6 +19,7 @@ export async function POST(request: Request, context: RouteContext) {
   const typeRaw = String(formData.get("type") ?? "").trim();
   const statusRaw = String(formData.get("status") ?? "").trim();
   const parentIdRaw = String(formData.get("parent_id") ?? "").trim();
+  const outcomeIdRaw = String(formData.get("outcome_id") ?? "").trim();
   const shouldGenerateDecomposition = String(formData.get("generate_decomposition") ?? "").trim() === "true";
 
   if (!title) {
@@ -36,6 +37,7 @@ export async function POST(request: Request, context: RouteContext) {
   const type = typeRaw as WorkItemType;
   const status = (statusRaw || "new") as WorkItemStatus;
   let parentId: string | undefined;
+  let outcomeId: string | undefined;
 
   if (parentIdRaw) {
     const parent = await prisma.workItem.findFirst({
@@ -56,6 +58,30 @@ export async function POST(request: Request, context: RouteContext) {
     parentId = parent.id;
   }
 
+  if (type === "feature") {
+    if (!outcomeIdRaw) {
+      return NextResponse.redirect(new URL(`/products/${productId}/work?error=workitem_feature_outcome_required`, request.url));
+    }
+
+    const outcome = await prisma.outcome.findFirst({
+      where: {
+        id: outcomeIdRaw,
+        journey_step: {
+          journey: {
+            product_id: productId,
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    if (!outcome) {
+      return NextResponse.redirect(new URL(`/products/${productId}/work?error=workitem_feature_outcome_invalid`, request.url));
+    }
+
+    outcomeId = outcome.id;
+  }
+
   try {
     await prisma.$transaction(async (tx) => {
       const createdWorkItem = await tx.workItem.create({
@@ -67,6 +93,7 @@ export async function POST(request: Request, context: RouteContext) {
           status,
           parent_id: parentId,
           product_id: productId,
+          outcome_id: outcomeId,
         },
       });
 
