@@ -191,6 +191,7 @@ Seeded `Check-a-Train` includes:
 ## Create Flows (v1)
 
 - WorkItems: use the form in `/products/[productId]/work` (`title`, optional `description`, optional `acceptance_criteria`, `type`, `status`, optional parent).
+- Story and Task WorkItems can generate deterministic acceptance criteria and structured content from the WorkItem detail page.
 - Pages: use the form in `/products/[productId]/pages` (`title`, optional `body`, optional linked WorkItem).
 - Signals: use the form in `/products/[productId]/signals` (`title`, optional `description`, `signal type`, optional `severity`, optional linked WorkItem).
 - Relationships: use the form in `/products/[productId]/work` (`from WorkItem`, `relationship type`, `to WorkItem`).
@@ -198,6 +199,10 @@ Seeded `Check-a-Train` includes:
 - Each create flow validates on the server, then redirects back to the same view with success or error feedback.
 - EntityLink validation ensures both entities belong to the same Product and prevents exact duplicates.
 - WorkItem status can be updated from the Work hierarchy using the status selector on each row.
+- WorkItem description and acceptance criteria can be updated from `/products/[productId]/work/[workItemId]`.
+- Story and Task detail pages expose a `Generate Acceptance Criteria` action when criteria are missing.
+- Story and Task detail pages expose a `Generate Codex Prompt` action with a copy-to-clipboard button.
+- WorkItem detail pages with direct Story or Task children expose bulk builder actions to generate missing child acceptance criteria and prepare deterministic child Codex prompts in one step.
 - Comments: add WorkItem comments from `/products/[productId]/work/[workItemId]` (comment body required, default system author).
 
 ## Decisions In App
@@ -211,6 +216,7 @@ Seeded `Check-a-Train` includes:
 ## Completion Model (v1)
 
 - Acceptance Criteria are WorkItem-level and define completion expectations for a single WorkItem.
+- Story and Task acceptance criteria can be generated deterministically from title, description, and parent context, then edited by the builder before implementation handoff.
 - Definition of Done is Product-level and defines the shared quality bar for completed WorkItems in that Product.
 - Definition of Done is not duplicated across individual WorkItems.
 

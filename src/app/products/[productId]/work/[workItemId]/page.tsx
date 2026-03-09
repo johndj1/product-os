@@ -7,12 +7,17 @@ import { calculatePriorityForWorkItem } from "@/lib/priority-scoring";
 import { prisma } from "@/lib/prisma";
 import { getRelationshipsForProduct } from "@/lib/relationships";
 import { asObject } from "@/lib/signals";
+import { generateCodexPrompt } from "@/lib/workitem-prompt";
+import BackButton from "./back-button";
+import Breadcrumbs from "./breadcrumbs";
+import ChildBuilderPanel from "./child-builder-panel";
+import CodexPromptPanel from "./codex-prompt-panel";
 
 export const dynamic = "force-dynamic";
 
 type WorkItemDetailProps = {
   params: Promise<{ productId: string; workItemId: string }>;
-  searchParams: Promise<{ error?: string; success?: string }>;
+  searchParams: Promise<{ count?: string; error?: string; showChildPrompts?: string; success?: string }>;
 };
 
 const detailMessages: Record<string, string> = {
@@ -21,7 +26,21 @@ const detailMessages: Record<string, string> = {
   workitem_not_found: "WorkItem not found for this Product.",
   feature_decomposition_created: "Suggested Stories and Tasks created for this Feature.",
   feature_decomposition_invalid: "Feature decomposition is only available once per Feature and requires a Feature WorkItem.",
+  workitem_content_generated: "Acceptance criteria and structured WorkItem content generated.",
+  workitem_updated: "WorkItem details updated.",
 };
+
+function getDetailMessage(type: "error" | "success", code?: string, count?: number | null): string | null {
+  if (!code) {
+    return null;
+  }
+
+  if (type === "success" && code === "child_acceptance_criteria_generated") {
+    return `Acceptance criteria generated for ${count ?? 0} WorkItem${count === 1 ? "" : "s"}.`;
+  }
+
+  return detailMessages[code] ?? (type === "error" ? "Could not save comment." : "Saved.");
+}
 
 function getKpiProgressPercent(currentValue: number | null, targetValue: number | null): number | null {
   if (currentValue === null || targetValue === null) {
@@ -51,6 +70,40 @@ function statusBadgeClass(status: string): string {
   return "bg-slate-100 text-slate-700";
 }
 
+type WorkItemAncestor = {
+  id: string;
+  title: string;
+  parent_id: string | null;
+};
+
+async function getWorkItemAncestors(productId: string, parentId: string | null): Promise<WorkItemAncestor[]> {
+  const ancestors: WorkItemAncestor[] = [];
+  const visited = new Set<string>();
+  let currentParentId = parentId;
+
+  while (currentParentId && !visited.has(currentParentId)) {
+    visited.add(currentParentId);
+
+    const ancestor = await prisma.workItem.findFirst({
+      where: { id: currentParentId, product_id: productId },
+      select: {
+        id: true,
+        title: true,
+        parent_id: true,
+      },
+    });
+
+    if (!ancestor) {
+      break;
+    }
+
+    ancestors.unshift(ancestor);
+    currentParentId = ancestor.parent_id;
+  }
+
+  return ancestors;
+}
+
 export default async function WorkItemDetailPage({ params, searchParams }: WorkItemDetailProps) {
   const { productId, workItemId } = await params;
   const query = await searchParams;
@@ -69,12 +122,32 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
       target_value: true,
       unit: true,
       last_updated_at: true,
+      product: {
+        select: {
+          name: true,
+        },
+      },
       parent: {
-        select: { id: true, title: true, type: true, status: true },
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          status: true,
+          description: true,
+          parent: {
+            select: {
+              id: true,
+              title: true,
+              type: true,
+              status: true,
+              description: true,
+            },
+          },
+        },
       },
       children: {
         orderBy: [{ type: "asc" }, { title: "asc" }],
-        select: { id: true, title: true, type: true, status: true },
+        select: { id: true, title: true, type: true, status: true, description: true, acceptance_criteria: true },
       },
       outgoing_relationships: {
         orderBy: { created_at: "desc" },
@@ -138,8 +211,10 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
     notFound();
   }
 
-  const errorMessage = query.error ? detailMessages[query.error] ?? "Could not save comment." : null;
-  const successMessage = query.success ? detailMessages[query.success] ?? "Saved." : null;
+  const count = query.count ? Number.parseInt(query.count, 10) : null;
+  const childBuilderChildren = workItem.children.filter((child) => child.type === "story" || child.type === "task");
+  const errorMessage = getDetailMessage("error", query.error, Number.isNaN(count ?? NaN) ? null : count);
+  const successMessage = getDetailMessage("success", query.success, Number.isNaN(count ?? NaN) ? null : count);
   const relatedWorkItems = [
     ...workItem.outgoing_relationships.map((relationship) => relationship.to_work_item),
     ...workItem.incoming_relationships.map((relationship) => relationship.from_work_item),
@@ -188,6 +263,17 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
     }),
     getGroupedEntityLinksForEntity(prisma, productId, EntityType.work_item, workItemId),
   ]);
+  const ancestorItems = await getWorkItemAncestors(productId, workItem.parent_id);
+  const workIndexHref = `/products/${productId}/work`;
+  const breadcrumbItems = [
+    { label: workItem.product.name, href: `/products/${productId}` },
+    { label: "Work", href: workIndexHref },
+    ...ancestorItems.map((ancestor) => ({
+      label: ancestor.title,
+      href: `/products/${productId}/work/${ancestor.id}`,
+    })),
+    { label: workItem.title },
+  ];
 
   const priority = calculatePriorityForWorkItem(
     {
@@ -205,17 +291,90 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
   const reusedSignalCount = workItem.signals.filter((signal) => signal.routing_note?.includes("existing active")).length;
   const usagePatternSignals = workItem.signals.filter((signal) => asObject(signal.payload)?.usagePattern);
   const storyChildren = workItem.children.filter((child) => child.type === "story");
+  const childPromptItems = childBuilderChildren.map((child) => ({
+    id: child.id,
+    title: child.title,
+    type: child.type,
+    prompt: generateCodexPrompt({
+      productName: workItem.product.name,
+      workItem: {
+        type: child.type,
+        title: child.title,
+        description: child.description,
+        acceptanceCriteria: child.acceptance_criteria,
+      },
+      parent: {
+        type: workItem.type,
+        title: workItem.title,
+        description: workItem.description,
+        acceptanceCriteria: workItem.acceptance_criteria,
+      },
+      grandparent: workItem.parent
+        ? {
+            type: workItem.parent.type,
+            title: workItem.parent.title,
+            description: workItem.parent.description,
+            acceptanceCriteria: null,
+          }
+        : null,
+    }),
+  }));
+  const codexPrompt = generateCodexPrompt({
+    productName: workItem.product.name,
+    workItem: {
+      type: workItem.type,
+      title: workItem.title,
+      description: workItem.description,
+      acceptanceCriteria: workItem.acceptance_criteria,
+    },
+    parent: workItem.parent
+      ? {
+          type: workItem.parent.type,
+          title: workItem.parent.title,
+          description: workItem.parent.description,
+          acceptanceCriteria: null,
+        }
+      : null,
+    grandparent: workItem.parent?.parent
+      ? {
+          type: workItem.parent.parent.type,
+          title: workItem.parent.parent.title,
+          description: workItem.parent.parent.description,
+          acceptanceCriteria: null,
+        }
+      : null,
+    children: workItem.children.map((child) => ({
+      type: child.type,
+      title: child.title,
+      description: null,
+      acceptanceCriteria: null,
+    })),
+  });
+  const canGenerateContent = (workItem.type === "story" || workItem.type === "task") && !workItem.acceptance_criteria;
+  const canGeneratePrompt = workItem.type === "story" || workItem.type === "task";
+  const canPrepareChildren = childBuilderChildren.length > 0;
   const now = new Date();
 
   return (
     <section className="grid gap-4">
+      <article className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <BackButton fallbackHref={workIndexHref} />
+          <Breadcrumbs items={breadcrumbItems} />
+        </div>
+      </article>
+
       <article className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-2xl font-semibold text-slate-900">{workItem.title}</h2>
           <span className="rounded bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-600">{workItem.type}</span>
           <span className={`rounded px-2 py-0.5 text-xs uppercase tracking-wide ${statusBadgeClass(workItem.status)}`}>{workItem.status}</span>
         </div>
-        {workItem.description ? <p className="mt-2 text-sm text-slate-600">{workItem.description}</p> : <p className="mt-2 text-sm text-slate-500">No description provided.</p>}
+        {workItem.description ? (
+          <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-slate-600">{workItem.description}</pre>
+        ) : (
+          <p className="mt-2 text-sm text-slate-500">No description provided.</p>
+        )}
         {workItem.signals.length > 0 ? (
           <p className="mt-2 text-xs text-slate-500">
             {workItem.signals.length} linked Signals
@@ -284,14 +443,70 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
         </article>
       ) : null}
 
+      {canPrepareChildren ? (
+        <ChildBuilderPanel
+          productId={productId}
+          workItemId={workItem.id}
+          promptChildren={childPromptItems}
+          missingAcceptanceCriteriaCount={childBuilderChildren.filter((child) => !child.acceptance_criteria).length}
+          defaultShowPrompts={query.showChildPrompts === "1"}
+        />
+      ) : null}
+
       <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Acceptance Criteria</h3>
-        {workItem.acceptance_criteria ? (
-          <pre className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{workItem.acceptance_criteria}</pre>
-        ) : (
-          <p className="mt-2 text-sm text-slate-500">No acceptance criteria defined for this WorkItem.</p>
-        )}
+        {!workItem.acceptance_criteria ? (
+          <div className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
+            <p className="text-sm text-slate-600">No acceptance criteria defined for this WorkItem.</p>
+            {canGenerateContent ? (
+              <form action={`/products/${productId}/work/${workItem.id}/generate`} method="post" className="mt-3">
+                <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                  Generate Acceptance Criteria
+                </button>
+              </form>
+            ) : null}
+          </div>
+        ) : null}
+        <form action={`/products/${productId}/work/${workItem.id}/update`} method="post" className="mt-3 grid gap-3">
+          <div>
+            <label htmlFor="description" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+              Description
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              rows={3}
+              defaultValue={workItem.description ?? ""}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+              placeholder="Short context for this WorkItem"
+            />
+          </div>
+          <div>
+            <label htmlFor="acceptance_criteria" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+              Acceptance criteria
+            </label>
+            <textarea
+              id="acceptance_criteria"
+              name="acceptance_criteria"
+              rows={6}
+              defaultValue={workItem.acceptance_criteria ?? ""}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+              placeholder="Define what must be true for this WorkItem to be considered complete."
+            />
+          </div>
+          <button type="submit" className="w-fit rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+            Save WorkItem Details
+          </button>
+        </form>
       </article>
+
+      {canGeneratePrompt ? (
+        <article className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Codex Handoff Prompt</h3>
+          <p className="mt-2 text-sm text-slate-600">Generate a Codex-ready implementation prompt from this {workItem.type} and its hierarchy context.</p>
+          <CodexPromptPanel prompt={codexPrompt} />
+        </article>
+      ) : null}
 
       <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Priority</h3>

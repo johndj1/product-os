@@ -71,6 +71,9 @@ export default function WorkItemCreateForm({ productId, parentOptions }: WorkIte
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
           placeholder="Define what must be true for this WorkItem to be considered complete."
         />
+        {selectedType === "story" || selectedType === "task" ? (
+          <p className="mt-1 text-xs text-slate-500">Leave this blank if you want to generate deterministic acceptance criteria later from the WorkItem detail page.</p>
+        ) : null}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">

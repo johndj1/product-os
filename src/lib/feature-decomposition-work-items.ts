@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient, WorkItemStatus, WorkItemType } from "@prisma/client";
 import { generateFeatureDecomposition } from "./feature-decomposition";
+import { generateWorkItemContent } from "./workitem-criteria";
 
 type WorkItemTransactionClient = Prisma.TransactionClient | PrismaClient;
 
@@ -33,10 +34,23 @@ export async function createFeatureDecompositionWorkItems(
   const decomposition = generateFeatureDecomposition(feature.title, feature.description);
 
   for (const story of decomposition.stories) {
+    const storyContent = generateWorkItemContent({
+      type: "story",
+      title: story.title,
+      description: story.description,
+      parent: {
+        type: feature.type,
+        title: feature.title,
+        description: feature.description,
+        parent: null,
+      },
+    });
+
     const createdStory = await prismaClient.workItem.create({
       data: {
         title: story.title,
-        description: story.description ?? null,
+        description: storyContent.description,
+        acceptance_criteria: storyContent.acceptanceCriteria,
         type: "story",
         status: WorkItemStatus.new,
         parent_id: feature.id,
@@ -49,14 +63,32 @@ export async function createFeatureDecompositionWorkItems(
     }
 
     await prismaClient.workItem.createMany({
-      data: story.tasks.map((task) => ({
-        title: task.title,
-        description: task.description ?? null,
-        type: "task",
-        status: WorkItemStatus.new,
-        parent_id: createdStory.id,
-        product_id: feature.product_id,
-      })),
+      data: story.tasks.map((task) => {
+        const taskContent = generateWorkItemContent({
+          type: "task",
+          title: task.title,
+          description: task.description,
+          parent: {
+            type: "story",
+            title: story.title,
+            description: storyContent.description,
+            parent: {
+              type: feature.type,
+              title: feature.title,
+            },
+          },
+        });
+
+        return {
+          title: task.title,
+          description: taskContent.description,
+          acceptance_criteria: taskContent.acceptanceCriteria,
+          type: "task",
+          status: WorkItemStatus.new,
+          parent_id: createdStory.id,
+          product_id: feature.product_id,
+        };
+      }),
     });
   }
 
