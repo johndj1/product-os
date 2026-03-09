@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient, SignalStatus, SignalType, WorkItemStatus, WorkItemType } from "@prisma/client";
-import { resolveSignalTaxonomy } from "@/lib/signals";
+import { asObject, extractExternalSignalNameFromPayload, resolveSignalTaxonomy } from "@/lib/signals";
+import { evaluateUsagePattern, PROVIDER_FAILURE_INVESTIGATION_TITLE } from "@/lib/usage-patterns";
 
 const ACTIVE_WORK_ITEM_STATUSES: WorkItemStatus[] = [
   WorkItemStatus.new,
@@ -38,6 +39,15 @@ type RoutedWorkItemMatch = {
   routingNote: string;
 };
 
+type RoutedWorkItemCandidate = {
+  type: WorkItemType;
+  title: string;
+  reuseNote: string;
+  createNote: string;
+  description?: string;
+  summaryNote?: string;
+};
+
 function isHighSeverity(value: string | null | undefined): boolean {
   if (!value) {
     return false;
@@ -61,16 +71,9 @@ function workItemDescription(signal: IngestSignalInput): string {
   return lines.join("\n");
 }
 
-function asObject(value: Prisma.InputJsonValue | Prisma.JsonObject | null | undefined): Prisma.JsonObject | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-  return value as Prisma.JsonObject;
-}
-
 function extractKpiChangePayload(payload: Prisma.InputJsonValue | undefined): KpiChangePayload | null {
   const top = asObject(payload);
-  const raw = asObject(top?.raw as Prisma.InputJsonValue | undefined);
+  const raw = asObject(top?.raw);
   const candidate = raw ?? top;
 
   if (!candidate) {
@@ -103,15 +106,12 @@ function extractKpiChangePayload(payload: Prisma.InputJsonValue | undefined): Kp
 
 function isExternalSignalPayload(payload: Prisma.InputJsonValue | undefined): boolean {
   const top = asObject(payload);
-  const externalSignal = asObject(top?.externalSignal as Prisma.InputJsonValue | undefined);
+  const externalSignal = asObject(top?.externalSignal);
   return externalSignal !== null;
 }
 
 function extractExternalSignalName(payload: Prisma.InputJsonValue | undefined): string | null {
-  const top = asObject(payload);
-  const externalSignal = asObject(top?.externalSignal as Prisma.InputJsonValue | undefined);
-  const signalName = externalSignal?.signalName;
-  return typeof signalName === "string" && signalName.trim().length > 0 ? signalName.trim() : null;
+  return extractExternalSignalNameFromPayload(payload);
 }
 
 async function findActiveMatchingWorkItem(
@@ -137,6 +137,7 @@ async function createWorkItemFromSignal(
   input: IngestSignalInput,
   type: WorkItemType,
   title: string,
+  description?: string,
 ) {
   return prisma.workItem.create({
     data: {
@@ -144,7 +145,7 @@ async function createWorkItemFromSignal(
       type,
       status: WorkItemStatus.new,
       title,
-      description: workItemDescription(input),
+      description: description ?? workItemDescription(input),
     },
     select: { id: true },
   });
@@ -157,6 +158,7 @@ async function findOrCreateRoutedWorkItem(
   title: string,
   reuseNote: string,
   createNote: string,
+  description?: string,
 ): Promise<RoutedWorkItemMatch> {
   const existingWorkItem = await findActiveMatchingWorkItem(prisma, input.productId, type, title);
 
@@ -168,7 +170,7 @@ async function findOrCreateRoutedWorkItem(
     };
   }
 
-  const createdWorkItem = await createWorkItemFromSignal(prisma, input, type, title);
+  const createdWorkItem = await createWorkItemFromSignal(prisma, input, type, title, description);
 
   return {
     workItemId: createdWorkItem.id,
@@ -185,51 +187,47 @@ export async function ingestSignal(prisma: PrismaClient, input: IngestSignalInpu
   const isExternalSignal = isExternalSignalPayload(input.payload);
   const externalSignalName = extractExternalSignalName(input.payload);
   const taxonomy = resolveSignalTaxonomy(input.signalType, externalSignalName);
+  let routedWorkItemCandidate: RoutedWorkItemCandidate | null = null;
 
   if (input.signalType === "test_failure") {
-    const bugTitle = `Investigate test failure: ${input.title}`;
-    const bugMatch = await findOrCreateRoutedWorkItem(
-      prisma,
-      input,
-      WorkItemType.bug,
-      bugTitle,
-      "Linked to existing active bug WorkItem.",
-      "Created new bug WorkItem from test failure signal.",
-    );
-
-    linkedWorkItemId = bugMatch.workItemId;
-    createdFollowUp = bugMatch.created;
-    routingNote = bugMatch.routingNote;
+    routedWorkItemCandidate = {
+      type: WorkItemType.bug,
+      title: `Investigate test failure: ${input.title}`,
+      reuseNote: "Linked to existing active bug WorkItem via single-signal routing.",
+      createNote: "Single-signal routing created a new bug WorkItem from the test failure signal.",
+    };
   }
 
   if (input.signalType === "incident_alert") {
-    const incidentMatch = await findOrCreateRoutedWorkItem(
-      prisma,
-      input,
-      WorkItemType.incident,
-      `Incident alert: ${input.title}`,
-      "Linked to existing active incident WorkItem.",
-      isExternalSignal ? "Created new incident WorkItem from external signal." : "Created new incident WorkItem from incident alert signal.",
-    );
-
-    linkedWorkItemId = incidentMatch.workItemId;
-    createdFollowUp = incidentMatch.created;
-    routingNote = incidentMatch.routingNote;
+    routedWorkItemCandidate = {
+      type: WorkItemType.incident,
+      title: `Incident alert: ${input.title}`,
+      reuseNote: "Linked to existing active incident WorkItem via single-signal routing.",
+      createNote: isExternalSignal
+        ? "Single-signal routing created a new incident WorkItem from the external signal."
+        : "Single-signal routing created a new incident WorkItem from the incident alert signal.",
+    };
   }
 
   if (input.signalType === "anomaly" && isHighSeverity(input.severity)) {
-    const anomalyMatch = await findOrCreateRoutedWorkItem(
-      prisma,
-      input,
-      WorkItemType.incident,
-      `Investigate anomaly: ${input.title}`,
-      "Linked to existing active investigation WorkItem.",
-      isExternalSignal ? "Created new investigation WorkItem from external signal." : "Created new investigation WorkItem from anomaly signal.",
-    );
-
-    linkedWorkItemId = anomalyMatch.workItemId;
-    createdFollowUp = anomalyMatch.created;
-    routingNotes.push(anomalyMatch.routingNote);
+    routedWorkItemCandidate =
+      externalSignalName === "darwin_api_error"
+        ? {
+            type: WorkItemType.research,
+            title: PROVIDER_FAILURE_INVESTIGATION_TITLE,
+            reuseNote: "Linked to existing active provider-failure investigation WorkItem via single-signal routing.",
+            createNote: "Single-signal routing created a new provider-failure investigation WorkItem for Darwin API errors.",
+            description:
+              "Created from single-signal provider-failure routing for darwin_api_error.\nSignal family: provider_failure.\nUse this WorkItem for the active Darwin provider investigation until resolved.",
+          }
+        : {
+            type: WorkItemType.incident,
+            title: `Investigate anomaly: ${input.title}`,
+            reuseNote: "Linked to existing active investigation WorkItem via single-signal routing.",
+            createNote: isExternalSignal
+              ? "Single-signal routing created a new investigation WorkItem from the external signal."
+              : "Single-signal routing created a new investigation WorkItem from the anomaly signal.",
+          };
   }
 
   if (input.signalType === "kpi_change" && isHighSeverity(input.severity)) {
@@ -238,8 +236,8 @@ export async function ingestSignal(prisma: PrismaClient, input: IngestSignalInpu
       input,
       WorkItemType.research,
       `Investigate KPI change: ${input.title}`,
-      "Linked to existing active KPI investigation WorkItem.",
-      "Created new KPI investigation WorkItem from high-severity KPI change signal.",
+      "Linked to existing active KPI investigation WorkItem via single-signal routing.",
+      "Single-signal routing created a new KPI investigation WorkItem from the high-severity KPI change signal.",
     );
 
     linkedWorkItemId = researchMatch.workItemId;
@@ -282,33 +280,70 @@ export async function ingestSignal(prisma: PrismaClient, input: IngestSignalInpu
   }
 
   if (input.signalType === "delivery_risk") {
-    const storyMatch = await findOrCreateRoutedWorkItem(
-      prisma,
-      input,
-      WorkItemType.story,
-      `Address delivery risk: ${input.title}`,
-      "Linked to existing active delivery risk WorkItem.",
-      "Created new delivery risk WorkItem from signal.",
-    );
-
-    linkedWorkItemId = storyMatch.workItemId;
-    createdFollowUp = storyMatch.created;
-    routingNotes.push(storyMatch.routingNote);
+    routedWorkItemCandidate = {
+      type: WorkItemType.story,
+      title: `Address delivery risk: ${input.title}`,
+      reuseNote: "Linked to existing active delivery risk WorkItem via single-signal routing.",
+      createNote: "Single-signal routing created a new delivery risk WorkItem from the signal.",
+    };
   }
 
   if (input.signalType === "usage_pattern" && isHighSeverity(input.severity)) {
-    const researchMatch = await findOrCreateRoutedWorkItem(
+    routedWorkItemCandidate = {
+      type: WorkItemType.research,
+      title: `Investigate usage pattern: ${input.title}`,
+      reuseNote: "Linked to existing active usage investigation WorkItem via single-signal routing.",
+      createNote: isExternalSignal
+        ? "Single-signal routing created a new investigation WorkItem from the external signal."
+        : "Single-signal routing created a new usage investigation WorkItem from the signal.",
+    };
+  }
+
+  if (routedWorkItemCandidate) {
+    routingNotes.push(`Single-signal routing matched: ${routedWorkItemCandidate.title}.`);
+  }
+
+  const usagePatternCandidate = await evaluateUsagePattern(prisma, {
+    productId: input.productId,
+    signalType: input.signalType,
+    occurredAt: input.occurredAt,
+    payload: input.payload,
+  });
+
+  const selectedWorkItemCandidate = usagePatternCandidate
+    ? {
+        type: usagePatternCandidate.workItemType,
+        title: usagePatternCandidate.title,
+        reuseNote: usagePatternCandidate.reuseNote,
+        createNote: usagePatternCandidate.createNote,
+        description: usagePatternCandidate.workItemDescription,
+        summaryNote: usagePatternCandidate.summaryNote,
+      }
+    : routedWorkItemCandidate;
+
+  if (usagePatternCandidate) {
+    routingNotes.push(usagePatternCandidate.summaryNote);
+    const payloadObject = (asObject(input.payload) ?? {}) as Prisma.InputJsonObject;
+    input.payload = {
+      ...payloadObject,
+      ...(usagePatternCandidate.context as Prisma.InputJsonObject),
+    };
+  }
+
+  if (selectedWorkItemCandidate) {
+    const routedMatch = await findOrCreateRoutedWorkItem(
       prisma,
       input,
-      WorkItemType.research,
-      `Investigate usage pattern: ${input.title}`,
-      "Linked to existing active usage investigation WorkItem.",
-      isExternalSignal ? "Created new investigation WorkItem from external signal." : "Created new usage investigation WorkItem from signal.",
+      selectedWorkItemCandidate.type,
+      selectedWorkItemCandidate.title,
+      selectedWorkItemCandidate.reuseNote,
+      selectedWorkItemCandidate.createNote,
+      selectedWorkItemCandidate.description,
     );
 
-    linkedWorkItemId = researchMatch.workItemId;
-    createdFollowUp = researchMatch.created;
-    routingNotes.push(researchMatch.routingNote);
+    linkedWorkItemId = routedMatch.workItemId;
+    createdFollowUp = routedMatch.created;
+    routingNotes.push(routedMatch.routingNote);
   }
 
   if (routingNotes.length > 0) {

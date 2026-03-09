@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
+import { formatTimestampWithRelative } from "@/lib/date-time";
 import { prisma } from "@/lib/prisma";
-import { formatSignalTaxonomyValue } from "@/lib/signals";
+import { asObject, extractExternalSignalNameFromPayload, formatSignalTaxonomyValue } from "@/lib/signals";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,11 @@ const signalMessages: Record<string, string> = {
   signal_type_invalid: "Signal type is invalid.",
   signal_workitem_invalid: "Linked WorkItem was not found for this Product.",
 };
+
+function getUsagePatternKey(payload: unknown): string | null {
+  const usagePattern = asObject(asObject(payload)?.usagePattern);
+  return typeof usagePattern?.key === "string" ? usagePattern.key : null;
+}
 
 export default async function ProductSignalsView({ params, searchParams }: SignalsViewProps) {
   const { productId } = await params;
@@ -43,6 +49,8 @@ export default async function ProductSignalsView({ params, searchParams }: Signa
         severity: true,
         created_follow_up: true,
         routing_note: true,
+        payload: true,
+        created_at: true,
         updated_at: true,
         work_item: {
           select: {
@@ -66,12 +74,13 @@ export default async function ProductSignalsView({ params, searchParams }: Signa
 
   const errorMessage = query.error ? signalMessages[query.error] ?? "Could not ingest signal." : null;
   const successMessage = query.success ? signalMessages[query.success] ?? "Saved." : null;
+  const now = new Date();
 
   return (
     <section className="grid gap-4">
       <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold text-slate-900">Signals</h2>
-        <p className="mt-2 text-sm text-slate-600">Signals route into Product work through deterministic rules, with lightweight taxonomy for grouping and future pattern detection.</p>
+        <p className="mt-2 text-sm text-slate-600">Signals route into Product work through deterministic rules, with lightweight taxonomy and small usage-pattern checks for repeated Product behaviour.</p>
       </article>
 
       {errorMessage ? <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p> : null}
@@ -172,12 +181,19 @@ export default async function ProductSignalsView({ params, searchParams }: Signa
           <ul className="mt-3 space-y-2">
             {signals.map((signal) => (
               <li key={signal.id} className="rounded-md border border-slate-100 p-3">
+                {(() => {
+                  const usagePatternKey = getUsagePatternKey(signal.payload);
+                  const externalSignalName = extractExternalSignalNameFromPayload(signal.payload);
+
+                  return (
+                    <>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-medium text-slate-900">{signal.title}</p>
                   <span className="rounded bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-600">{signal.status}</span>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                   <span className="uppercase tracking-wide text-slate-500">{signal.signal_type}</span>
+                  {externalSignalName ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">event: {externalSignalName}</span> : null}
                   {signal.signal_family ? (
                     <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
                       family: {formatSignalTaxonomyValue(signal.signal_family)}
@@ -188,15 +204,27 @@ export default async function ProductSignalsView({ params, searchParams }: Signa
                       category: {formatSignalTaxonomyValue(signal.signal_category)}
                     </span>
                   ) : null}
+                  {usagePatternKey ? (
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                      usage pattern: {usagePatternKey.replace(/_/g, " ")}
+                    </span>
+                  ) : null}
                 </div>
                 {signal.severity ? <p className="mt-1 text-xs text-slate-500">Severity: {signal.severity}</p> : null}
                 {signal.work_item?.title ? <p className="mt-1 text-xs text-slate-500">Linked WorkItem: {signal.work_item.title}</p> : null}
+                {usagePatternKey && signal.work_item?.title ? <p className="mt-1 text-xs text-slate-500">Linked WorkItem was routed from a usage pattern match.</p> : null}
                 {signal.work_item?._count.signals && signal.work_item._count.signals > 1 ? (
                   <p className="mt-1 text-xs text-slate-500">Linked WorkItem has {signal.work_item._count.signals} associated Signals.</p>
                 ) : null}
                 <p className="mt-1 text-xs text-slate-500">Created follow-up work: {signal.created_follow_up ? "yes" : "no"}</p>
                 {signal.routing_note ? <p className="mt-1 text-xs text-slate-500">Routing: {signal.routing_note}</p> : null}
-                <p className="mt-2 text-xs text-slate-500">Updated {signal.updated_at.toLocaleDateString()}</p>
+                <div className="mt-2 space-y-1 text-xs text-slate-500">
+                  <p>Occurred: {formatTimestampWithRelative(signal.created_at, now)}</p>
+                  <p>Last updated: {formatTimestampWithRelative(signal.updated_at, now)}</p>
+                </div>
+                    </>
+                  );
+                })()}
               </li>
             ))}
           </ul>

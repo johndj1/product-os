@@ -231,11 +231,14 @@ Seeded `Check-a-Train` includes:
 - API endpoint: `POST /api/signals/ingest`
 - Accepts either the internal/manual contract (`productId` or `productSlug` plus Product OS signal fields) or a simple external contract for product-originated signals.
 - Optional event metadata fields: `source`, `sourceEventId`, `occurredAt`, and `tags`.
+- Signal views now show full date-and-time timestamps for operational investigation, with lightweight relative time alongside the absolute timestamp.
 - Product OS stores both the raw `signal_type` and a lightweight taxonomy layer: `signal_family` and `signal_category`.
 - Taxonomy exists so routing and future pattern detection can group signals at a stable family/category level without hardcoding every product-specific signal name.
 - Persists signal payload and applies deterministic routing to create follow-up WorkItems when rules match.
 - Repeated similar signals are deduplicated at the work-routing layer for active follow-up WorkItems, so repeated provider/API failures reuse the existing investigation WorkItem instead of creating duplicate delivery work.
+- Provider-failure routing for `darwin_api_error` now prefers one active provider-failure investigation path across both single-signal routing and `provider_failure_spike` usage-pattern routing.
 - Signals are still stored even when routing reuses an existing WorkItem.
+- A lightweight usage-pattern layer also checks recent stored Signals for the same Product before deciding the final follow-up WorkItem.
 
 ### External Product Signal Contract
 
@@ -272,6 +275,12 @@ Deterministic routing rules:
 - `kpi_change` with high-equivalent severity (`high`, `critical`, `sev1`, `sev2`, `p0`, `p1`): create a `research` WorkItem.
 - `usage_pattern` with high-equivalent severity (`high`, `critical`, `sev1`, `sev2`, `p0`, `p1`): create a `research` WorkItem.
 - `delivery_risk`: create a `story` WorkItem.
+
+Usage-pattern routing rules:
+
+- `provider_failure_spike`: if `darwin_api_error` reaches 5 Signals inside 15 minutes for the same Product, create or reuse `Investigate sustained Darwin provider instability`.
+- `delay_to_claim_drop_off`: if at least 8 `delay_detected` Signals inside 60 minutes significantly outweigh `claim_started` Signals for the same Product (claim-start ratio below `0.35` and a gap of at least `5`), create or reuse `Investigate drop-off between delay detection and claim start`.
+- When a usage pattern matches, Product OS records the pattern key and count context in the triggering Signal payload and appends the counts or ratio to the `routing_note`.
 
 KPI tracking updates:
 
@@ -328,5 +337,55 @@ curl -X POST http://localhost:3000/api/signals/ingest \
     }
   }'
 ```
+
+Provider failure spike verification, run this 5 times inside 15 minutes:
+
+```bash
+curl -X POST http://localhost:3000/api/signals/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product_slug": "check-a-train",
+    "signal_name": "darwin_api_error",
+    "timestamp": "2026-03-09T10:00:00.000Z",
+    "metadata": {
+      "provider": "darwin",
+      "flow": "journey_lookup",
+      "error_type": "timeout"
+    }
+  }'
+```
+
+Delay-to-claim drop-off verification, run the `delay_detected` request 8 times and the `claim_started` request 2 times inside 60 minutes:
+
+```bash
+curl -X POST http://localhost:3000/api/signals/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product_slug": "check-a-train",
+    "signal_name": "delay_detected",
+    "timestamp": "2026-03-09T11:00:00.000Z",
+    "metadata": {
+      "operator": "LNER",
+      "delay_minutes": 26,
+      "journey_id": "dropoff-demo-delay-1"
+    }
+  }'
+```
+
+```bash
+curl -X POST http://localhost:3000/api/signals/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "product_slug": "check-a-train",
+    "signal_name": "claim_started",
+    "timestamp": "2026-03-09T11:20:00.000Z",
+    "metadata": {
+      "operator": "LNER",
+      "journey_id": "dropoff-demo-claim-1"
+    }
+  }'
+```
+
+Open the Check-a-Train Signals view after sending the requests. The latest matching Signal should show a usage-pattern badge, a routing note with counts or ratio context, and a linked WorkItem created or reused from the matched pattern.
 
 For a Check-a-Train-specific integration guide, see `docs/platform/integrations/checkatrain-signal-ingestion.md`.

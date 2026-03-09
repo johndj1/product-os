@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EntityType } from "@prisma/client";
+import { formatTimestampWithRelative } from "@/lib/date-time";
 import { getGroupedEntityLinksForEntity } from "@/lib/entity-links";
 import { calculatePriorityForWorkItem } from "@/lib/priority-scoring";
 import { prisma } from "@/lib/prisma";
 import { getRelationshipsForProduct } from "@/lib/relationships";
+import { asObject } from "@/lib/signals";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +103,9 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
           status: true,
           created_follow_up: true,
           routing_note: true,
+          payload: true,
+          created_at: true,
+          updated_at: true,
         },
       },
       pages: {
@@ -195,7 +200,9 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
     signals,
   );
   const workItemEntityLinks = entityLinkData.grouped[`work_item:${workItemId}`] ?? { outgoing: [], incoming: [] };
-  const reusedSignalCount = workItem.signals.filter((signal) => signal.routing_note?.startsWith("Linked to existing active")).length;
+  const reusedSignalCount = workItem.signals.filter((signal) => signal.routing_note?.includes("existing active")).length;
+  const usagePatternSignals = workItem.signals.filter((signal) => asObject(signal.payload)?.usagePattern);
+  const now = new Date();
 
   return (
     <section className="grid gap-4">
@@ -212,6 +219,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
             {reusedSignalCount > 0 ? `, including ${reusedSignalCount} repeated routed event${reusedSignalCount === 1 ? "" : "s"}.` : "."}
           </p>
         ) : null}
+        {usagePatternSignals.length > 0 ? <p className="mt-2 text-xs text-amber-700">This WorkItem is being used as follow-up for a usage-pattern match.</p> : null}
       </article>
 
       {workItem.type === "decision" ? (
@@ -428,9 +436,13 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
                   <p className="mt-1 text-xs text-slate-500">
                     {signal.signal_type} - {signal.status}
                   </p>
-                  {signal.routing_note?.startsWith("Linked to existing active") ? (
+                  {asObject(signal.payload)?.usagePattern ? <p className="mt-1 text-xs text-amber-700">Usage-pattern-triggered routing.</p> : null}
+                  {signal.routing_note?.includes("existing active") ? (
                     <p className="mt-1 text-xs text-slate-500">Reused existing follow-up WorkItem.</p>
                   ) : null}
+                  <p className="mt-1 text-xs text-slate-500">Occurred: {formatTimestampWithRelative(signal.created_at, now)}</p>
+                  <p className="mt-1 text-xs text-slate-500">Last updated: {formatTimestampWithRelative(signal.updated_at, now)}</p>
+                  {signal.routing_note ? <p className="mt-1 text-xs text-slate-500">Routing: {signal.routing_note}</p> : null}
                 </li>
               ))}
             </ul>

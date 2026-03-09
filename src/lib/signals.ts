@@ -154,3 +154,21 @@ export function formatSignalTaxonomyValue(value: string): string {
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+export function asObject(value: unknown): Record<string, unknown> | null {
+  return isRecord(value) ? value : null;
+}
+
+export function extractExternalSignalNameFromPayload(payload: unknown): string | null {
+  const top = asObject(payload);
+  const externalSignal = asObject(top?.externalSignal);
+  const externalSignalName = externalSignal?.signalName;
+
+  if (typeof externalSignalName === "string" && externalSignalName.trim().length > 0) {
+    return externalSignalName.trim();
+  }
+
+  const raw = asObject(top?.raw);
+  const rawSignalName = raw?.event_name;
+  return typeof rawSignalName === "string" && rawSignalName.trim().length > 0 ? rawSignalName.trim() : null;
+}
