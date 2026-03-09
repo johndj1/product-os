@@ -30,6 +30,25 @@ type CreateWorkItemInput = {
   createdBy?: string;
 };
 
+type CreatePersonaInput = {
+  name: string;
+  description?: string;
+  productId: string;
+};
+
+type CreateJourneyStepInput = {
+  title: string;
+  description?: string;
+};
+
+type CreateJourneyInput = {
+  title: string;
+  description?: string;
+  productId: string;
+  personaIds?: string[];
+  steps: CreateJourneyStepInput[];
+};
+
 async function createWorkItem(input: CreateWorkItemInput) {
   if (input.parentId) {
     const parent = await prisma.workItem.findUniqueOrThrow({
@@ -53,6 +72,127 @@ async function createWorkItem(input: CreateWorkItemInput) {
       parent_id: input.parentId,
       product_id: input.productId,
       created_by: input.createdBy,
+    },
+  });
+}
+
+async function createPersona(input: CreatePersonaInput) {
+  const existingPersona = await prisma.persona.findFirst({
+    where: {
+      product_id: input.productId,
+      name: input.name,
+    },
+    select: { id: true },
+  });
+
+  if (existingPersona) {
+    return prisma.persona.update({
+      where: { id: existingPersona.id },
+      data: {
+        description: input.description,
+      },
+    });
+  }
+
+  return prisma.persona.create({
+    data: {
+      name: input.name,
+      description: input.description,
+      product_id: input.productId,
+    },
+  });
+}
+
+async function createJourney(input: CreateJourneyInput) {
+  const existingJourney = await prisma.journey.findFirst({
+    where: {
+      product_id: input.productId,
+      title: input.title,
+    },
+    select: { id: true },
+  });
+
+  if (existingJourney) {
+    await prisma.journey.update({
+      where: { id: existingJourney.id },
+      data: {
+        description: input.description,
+      },
+    });
+
+    for (const [index, step] of input.steps.entries()) {
+      const stepOrder = index + 1;
+      const existingStep = await prisma.journeyStep.findFirst({
+        where: {
+          journey_id: existingJourney.id,
+          step_order: stepOrder,
+        },
+        select: { id: true },
+      });
+
+      if (existingStep) {
+        await prisma.journeyStep.update({
+          where: { id: existingStep.id },
+          data: {
+            title: step.title,
+            description: step.description,
+          },
+        });
+      } else {
+        await prisma.journeyStep.create({
+          data: {
+            journey_id: existingJourney.id,
+            step_order: stepOrder,
+            title: step.title,
+            description: step.description,
+          },
+        });
+      }
+    }
+
+    for (const personaId of input.personaIds ?? []) {
+      const existingLink = await prisma.personaJourney.findFirst({
+        where: {
+          persona_id: personaId,
+          journey_id: existingJourney.id,
+        },
+        select: { id: true },
+      });
+
+      if (!existingLink) {
+        await prisma.personaJourney.create({
+          data: {
+            persona_id: personaId,
+            journey_id: existingJourney.id,
+          },
+        });
+      }
+    }
+
+    return prisma.journey.findUniqueOrThrow({
+      where: { id: existingJourney.id },
+    });
+  }
+
+  return prisma.journey.create({
+    data: {
+      title: input.title,
+      description: input.description,
+      product_id: input.productId,
+      persona_journeys: input.personaIds?.length
+        ? {
+            create: input.personaIds.map((personaId) => ({
+              persona_id: personaId,
+            })),
+          }
+        : undefined,
+      steps: {
+        create: input.steps.map((step, index) => ({
+          step_order: index + 1,
+          title: step.title,
+          description: step.description,
+        })),
+      },
     },
   });
 }
@@ -487,6 +627,65 @@ async function seedCheckATrain(systemUserId: string) {
       definition_of_done:
         "- Delay eligibility logic is traceable to live running data assumptions\n- KPI impact is clear for shipped MVP changes\n- Claim-start flow changes are documented",
     },
+  });
+
+  const delayedCommuter = await createPersona({
+    name: "Delayed commuter",
+    description:
+      "Regular rail user who needs to quickly determine if a delayed train qualifies for Delay Repay.",
+    productId: product.id,
+  });
+
+  const infrequentLeisureTraveller = await createPersona({
+    name: "Infrequent leisure traveller",
+    description:
+      "Occasional passenger who needs more explanation about delays, eligibility, and how to claim compensation.",
+    productId: product.id,
+  });
+
+  const journeyCompleteClaimant = await createPersona({
+    name: "Journey-complete claimant",
+    description:
+      "Passenger who checks eligibility after the journey has already finished, often later that day or after the event.",
+    productId: product.id,
+  });
+
+  const mobileFirstDistractedUser = await createPersona({
+    name: "Mobile-first distracted user",
+    description:
+      "User on the move with limited attention who needs a fast, low-friction path from delay check to claim handoff.",
+    productId: product.id,
+  });
+
+  await createJourney({
+    title: "Claim compensation for a delayed train",
+    description:
+      "The user discovers a delay, checks the journey details, determines Delay Repay eligibility, and starts a compensation claim with the correct operator.",
+    productId: product.id,
+    personaIds: [
+      delayedCommuter.id,
+      infrequentLeisureTraveller.id,
+      journeyCompleteClaimant.id,
+      mobileFirstDistractedUser.id,
+    ],
+    steps: [
+      {
+        title: "Discover delay",
+        description: "User realises a train may be delayed.",
+      },
+      {
+        title: "Check delay details",
+        description: "User looks up the train and reviews delay information.",
+      },
+      {
+        title: "Determine eligibility",
+        description: "User wants to know if the journey qualifies for Delay Repay.",
+      },
+      {
+        title: "Start claim",
+        description: "User begins the operator compensation process.",
+      },
+    ],
   });
 
   const outcome = await createWorkItem({
@@ -1377,6 +1576,10 @@ async function main() {
   await prisma.page.deleteMany();
   await prisma.signal.deleteMany();
   await prisma.entityLink.deleteMany();
+  await prisma.personaJourney.deleteMany();
+  await prisma.journeyStep.deleteMany();
+  await prisma.journey.deleteMany();
+  await prisma.persona.deleteMany();
   await prisma.relationship.deleteMany();
   await prisma.workItem.deleteMany();
   await prisma.product.deleteMany();
