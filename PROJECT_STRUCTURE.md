@@ -1,10 +1,12 @@
 # PROJECT_STRUCTURE.md
 
-Product OS is an outcome-driven product development system. It is designed to connect customer context, product reasoning, delivery work, and operational signals in one Product-scoped graph.
+Product OS is an outcome-driven product development system. It connects customer context, product reasoning, delivery work, operational signals, KPIs, and decisions in one Product-scoped graph.
 
 Agents should inspect repository files before making changes.
 
 This repository is not a generic backlog tool. Changes should preserve the rule that engineering work exists to support real user value, and that delivery work must trace back to customer outcomes.
+
+See `AGENTS.md` for repository rules and `WORKFLOW.md` for execution guidance.
 
 ## Mandatory Hierarchy
 
@@ -25,10 +27,13 @@ This hierarchy is the core reasoning model of the system. If a change weakens tr
 - `Journey`: an end-to-end user flow for a persona.
 - `Journey Step`: a concrete stage within a journey.
 - `Outcome`: the user value that should be achieved at a journey step.
-- `WorkItem`: the main planning and execution record. Types include `outcome`, `kpi`, `capability`, `feature`, `story`, `task`, `bug`, `research`, `incident`, and `decision`.
-- `Outcome Gap Detection`: logic that finds outcomes with no supporting `feature` WorkItems and suggests the next feature to create.
+- `WorkItem`: the main execution and planning record. Delivery work is expressed through WorkItems such as `feature`, `story`, and `task`.
+- `Outcome Gap Detection`: logic that finds customer outcomes with no supporting `feature` WorkItems and suggests the next feature to create.
 
-Important implementation detail: `feature` WorkItems must reference `outcome_id`. Downstream `story` and `task` items then trace through the parent-child WorkItem hierarchy.
+Important implementation detail:
+
+- `feature` WorkItems must reference `outcome_id`
+- downstream `story` and `task` items trace through the existing WorkItem hierarchy
 
 ## Technology Stack
 
@@ -54,14 +59,6 @@ Important implementation detail: `feature` WorkItems must reference `outcome_id`
   - `api/signals/ingest/route.ts`: signal ingestion entry point.
 - `docs/`: architecture, product model, decisions, examples, and operational context.
 
-## Development Philosophy
-
-- All work must trace to customer outcomes.
-- Product OS is not a generic ticketing or backlog system.
-- Product context comes before implementation detail.
-- Hierarchy, relationships, and cross-entity links serve different purposes and should not be merged conceptually.
-- Agents should extend existing rules rather than creating parallel logic paths.
-
 ## Typical Development Flow
 
 1. Define personas for the Product.
@@ -72,18 +69,4 @@ Important implementation detail: `feature` WorkItems must reference `outcome_id`
 6. Decompose features into stories and tasks.
 7. Execute delivery work with coding agents while preserving traceability.
 
-## Agent Guidance
-
-Inspect these files first for any domain-sensitive change:
-
-- `prisma/schema.prisma`
-- `prisma/seed.ts`
-- `src/lib/work-item-rules.ts`
-- `src/lib/work-item-hierarchy.ts`
-- `src/lib/outcome-gap-detection.ts`
-- `src/lib/signal-ingestion.ts`
-- `src/app/products/[productId]/work/create/route.ts`
-- `docs/platform/architecture/data-model.md`
-- `docs/platform/pdd/product-os.md`
-
-Do not treat this file as the only source of truth. Use it as a map to the real implementation.
+Keep this document practical. Use it as orientation, not as a substitute for inspecting the implementation.
