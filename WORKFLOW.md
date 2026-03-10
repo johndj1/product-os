@@ -26,6 +26,8 @@ For the requested change:
 - identify the highest-confidence customer outcome or product objective it supports
 - identify where the change sits in the mandatory hierarchy
 - confirm that `feature` work links to an `Outcome`
+- complete an Outcome Validation check before implementation starts
+- confirm that any proposed `feature` can explain how it should improve its linked `Outcome` before implementation starts
 - confirm that downstream delivery work preserves `Feature -> Story -> Task`
 
 Stop and redesign if:
@@ -33,6 +35,35 @@ Stop and redesign if:
 - the hierarchy is missing or broken
 - the request would create delivery work with no outcome linkage
 - the change would turn Product OS into a generic backlog or ticketing flow
+
+## Outcome Validation Before Implementation
+
+Before implementing any `feature`, `story`, or `task`, agents must validate that the work improves the linked customer `Outcome`.
+
+Outcome Validation Pattern
+
+Before implementation begins, confirm:
+
+1. Linked `Outcome`
+2. `Journey Step` and `Journey`
+3. How the work improves the `Outcome`
+4. Whether the work is:
+   - direct user value
+   - enabling capability
+   - drift
+
+If the work does not clearly support the `Outcome`, the agent should pause and request clarification before proceeding.
+
+Use `OUTCOME_VALIDATION.md` when you need the standard reusable validation block in a prompt.
+
+Check-a-Train example:
+
+- Outcome: `User understands whether their journey qualifies for Delay Repay`
+- Journey Step: `Determine eligibility`
+- Journey: `Claim compensation for a delayed train`
+- Feature: `Calculate Delay Repay eligibility`
+- Validation: this Feature improves the Outcome by converting service delay data into a clear user-facing eligibility decision.
+- Proceed: `Yes`
 
 ## Plan Before Implementation
 
@@ -91,6 +122,8 @@ Start with:
 
 - `AGENTS.md`
 - `PROJECT_STRUCTURE.md`
+- `GROUNDING_RULES.md`
+- `OUTCOME_VALIDATION.md`
 - `prisma/schema.prisma`
 - `prisma/seed.ts`
 
