@@ -7,12 +7,14 @@ import { calculatePriorityForWorkItem } from "@/lib/priority-scoring";
 import { prisma } from "@/lib/prisma";
 import { getRelationshipsForProduct } from "@/lib/relationships";
 import { asObject } from "@/lib/signals";
+import { getParsedWorkItemContent } from "@/lib/workitem-content";
 import { generateCodexPrompt } from "@/lib/workitem-prompt";
 import { getGeneratedWorkItemQualityGaps } from "@/lib/workitem-templates";
 import BackButton from "./back-button";
 import Breadcrumbs from "./breadcrumbs";
 import ChildBuilderPanel from "./child-builder-panel";
 import CodexPromptPanel from "./codex-prompt-panel";
+import WorkItemContentPanel from "./workitem-content-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +106,51 @@ async function getWorkItemAncestors(productId: string, parentId: string | null):
   }
 
   return ancestors;
+}
+
+function renderAcceptanceCriteriaDisplay(content: string) {
+  const normalized = content.replace(/\r\n/g, "\n").trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  const bulletLines = normalized
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (bulletLines.length > 0 && bulletLines.every((line) => /^[-*]\s+/.test(line))) {
+    return (
+      <ul className="space-y-2 text-sm text-slate-700">
+        {bulletLines.map((line, index) => (
+          <li key={`${line}-${index}`} className="flex gap-2">
+            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true" />
+            <span>{line.replace(/^[-*]\s+/, "")}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  if (/\bGiven\b/.test(normalized) && /\bWhen\b/.test(normalized) && /\bThen\b/.test(normalized)) {
+    const scenarios = normalized
+      .split(/\n\s*\n/)
+      .map((scenario) => scenario.trim())
+      .filter(Boolean);
+
+    return (
+      <div className="space-y-3">
+        {scenarios.map((scenario, index) => (
+          <div key={`${index}-${scenario.slice(0, 24)}`} className="rounded-md border border-slate-200 bg-slate-50 p-3">
+            <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700">{scenario}</pre>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700">{normalized}</pre>;
 }
 
 export default async function WorkItemDetailPage({ params, searchParams }: WorkItemDetailProps) {
@@ -420,6 +467,8 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
         story: storyContext?.title,
       };
   const generationGaps = getGeneratedWorkItemQualityGaps(workItem.type, workItem.description, workItem.acceptance_criteria);
+  const parsedContent = getParsedWorkItemContent(workItem.type, workItem.description, workItem.acceptance_criteria);
+  const acceptanceCriteriaDisplay = parsedContent.acceptanceCriteriaSection?.content ?? workItem.acceptance_criteria ?? null;
   const childPromptItems = childBuilderChildren.map((child) => ({
     id: child.id,
     title: child.title,
@@ -502,11 +551,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
           <span className="rounded bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-600">{workItem.type}</span>
           <span className={`rounded px-2 py-0.5 text-xs uppercase tracking-wide ${statusBadgeClass(workItem.status)}`}>{workItem.status}</span>
         </div>
-        {workItem.description ? (
-          <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-slate-600">{workItem.description}</pre>
-        ) : (
-          <p className="mt-2 text-sm text-slate-500">No description provided.</p>
-        )}
+        <WorkItemContentPanel type={workItem.type} description={workItem.description} acceptanceCriteria={workItem.acceptance_criteria} />
         {workItem.signals.length > 0 ? (
           <p className="mt-2 text-xs text-slate-500">
             {workItem.signals.length} linked Signals
@@ -671,7 +716,9 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
         ) : null}
         {!workItem.acceptance_criteria ? (
           <div className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
-            <p className="text-sm text-slate-600">No acceptance criteria defined for this WorkItem.</p>
+            <p className="text-sm text-slate-600">
+              {acceptanceCriteriaDisplay ? "Acceptance criteria are only present in the description body for this WorkItem." : "No acceptance criteria defined for this WorkItem."}
+            </p>
             {canGenerateContent ? (
               <form action={`/products/${productId}/work/${workItem.id}/generate`} method="post" className="mt-3">
                 <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
@@ -681,6 +728,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
             ) : null}
           </div>
         ) : null}
+        {acceptanceCriteriaDisplay ? <div className="mt-3">{renderAcceptanceCriteriaDisplay(acceptanceCriteriaDisplay)}</div> : null}
         <form action={`/products/${productId}/work/${workItem.id}/update`} method="post" className="mt-3 grid gap-3">
           <div>
             <label htmlFor="description" className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
