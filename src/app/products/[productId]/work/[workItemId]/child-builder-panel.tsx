@@ -41,7 +41,7 @@ export default function ChildBuilderPanel({
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-4">
       <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Builder Preparation</h3>
-      <p className="mt-2 text-sm text-slate-600">Prepare direct child Stories and Tasks for execution without opening each WorkItem individually.</p>
+      <p className="mt-2 text-sm text-slate-600">Prepare direct child Stories and Tasks in this delivery chain without opening each WorkItem individually.</p>
 
       <div className="mt-3 flex flex-wrap gap-3">
         <form action={`/products/${productId}/work/${workItemId}/generate-children`} method="post">

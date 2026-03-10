@@ -102,6 +102,9 @@ export default function WorkItemCreateForm({ productId, parentOptions, outcomeOp
               </option>
             ))}
           </select>
+          <p className="mt-1 text-xs text-slate-500">
+            Customer Outcomes live in the journey model. Use the Outcome field below to anchor delivery Features to customer value.
+          </p>
         </div>
 
         <div>
@@ -137,6 +140,14 @@ export default function WorkItemCreateForm({ productId, parentOptions, outcomeOp
           </select>
           {allowedParentTypes.length === 0 ? (
             <p className="mt-1 text-xs text-slate-500">This type can only be created as a root WorkItem in v1 guardrails.</p>
+          ) : selectedType === "feature" ? (
+            <p className="mt-1 text-xs text-slate-500">
+              Features use the linked Outcome as the delivery anchor. Parent is only for optional supporting groupings such as a capability.
+            </p>
+          ) : selectedType === "story" ? (
+            <p className="mt-1 text-xs text-slate-500">Stories should normally sit beneath a Feature.</p>
+          ) : selectedType === "task" ? (
+            <p className="mt-1 text-xs text-slate-500">Tasks should normally sit beneath a Story.</p>
           ) : null}
         </div>
       </div>
@@ -164,7 +175,7 @@ export default function WorkItemCreateForm({ productId, parentOptions, outcomeOp
         </select>
         {selectedType === "feature" ? (
           outcomeOptions.length > 0 ? (
-            <p className="mt-1 text-xs text-slate-500">Every Feature must support a customer Outcome for this Product.</p>
+            <p className="mt-1 text-xs text-slate-500">This is the delivery anchor for the Feature. Stories and Tasks will trace through the Feature parent-child chain.</p>
           ) : (
             <p className="mt-1 text-xs text-rose-600">No Outcomes exist for this Product yet. Create journey Outcomes before adding Features.</p>
           )
@@ -181,7 +192,7 @@ export default function WorkItemCreateForm({ productId, parentOptions, outcomeOp
             className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900"
           />
           <span>
-            Automatically generate suggested Stories and Tasks for this Feature.
+            Automatically generate suggested Stories and Tasks for this outcome-linked Feature.
           </span>
         </label>
       ) : null}

@@ -26,6 +26,7 @@ For the requested change:
 - identify the highest-confidence customer outcome or product objective it supports
 - identify where the change sits in the mandatory hierarchy
 - confirm that `feature` work links to an `Outcome`
+- keep the delivery chain legible in the UI as `Outcome -> Feature -> Story -> Task`
 - complete an Outcome Validation check before implementation starts
 - confirm that any proposed `feature` can explain how it should improve its linked `Outcome` before implementation starts
 - confirm that downstream delivery work preserves `Feature -> Story -> Task`

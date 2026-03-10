@@ -155,10 +155,13 @@ Prompts used in this repository should:
 
 - include the outcome-driven hierarchy context
 - include persona and journey context when the change affects product behavior or work structure
+- reference `GROUNDING_RULES.md` when one canonical grounding source is needed
+- reference `OUTCOME_VALIDATION.md` when implementation work should be challenged against the linked Outcome before coding starts
 - require inspection of repository files before changes
 - encourage reuse of existing patterns, rules, and route flows
 - prefer explicit, minimal changes over broad rewrites
 - name the customer outcome or product objective the work supports when known
+- require a pre-implementation check that explains why a proposed `feature` should improve its linked `Outcome`
 
 ## Working Style For Agents
 

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { EntityType } from "@prisma/client";
 import { getEntityLinksForEntity, getEntityLinksForProduct } from "@/lib/entity-links";
 import { prisma } from "@/lib/prisma";
-import { buildWorkItemTree, WorkItemTreeNode } from "@/lib/product-workspace";
+import { buildDeliveryHierarchy, buildWorkItemTree, DeliveryOutcomeNode, WorkItemTreeNode } from "@/lib/product-workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +51,54 @@ function renderTree(nodes: WorkItemTreeNode[]) {
   );
 }
 
+function renderDeliveryChildren(productId: string, nodes: WorkItemTreeNode[]) {
+  if (nodes.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="mt-3 space-y-2 border-l border-slate-200 pl-3">
+      {nodes.map((node) => (
+        <li key={node.id} className="rounded-md border border-slate-100 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Link href={`/products/${productId}/work/${node.id}`} className="font-medium text-slate-900 hover:underline">
+              {node.title}
+            </Link>
+            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-600">{node.status}</span>
+          </div>
+          <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">{node.type}</p>
+          {renderDeliveryChildren(productId, node.children)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function renderDeliveryHierarchy(productId: string, outcomeNodes: DeliveryOutcomeNode[]) {
+  if (outcomeNodes.length === 0) {
+    return <p className="text-sm text-slate-500">No customer Outcomes found yet.</p>;
+  }
+
+  return (
+    <ul className="space-y-3">
+      {outcomeNodes.map((outcome) => (
+        <li key={outcome.id} className="rounded-md border border-slate-100 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Outcome anchor</p>
+          <p className="mt-1 font-medium text-slate-900">{outcome.title}</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Journey: {outcome.journeyTitle} / Step: {outcome.journeyStepTitle}
+          </p>
+          {outcome.features.length === 0 ? (
+            <p className="mt-3 text-sm text-slate-500">No linked Feature yet.</p>
+          ) : (
+            renderDeliveryChildren(productId, outcome.features)
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default async function ProductOverviewPage({ params }: OverviewPageProps) {
   const { productId } = await params;
 
@@ -76,7 +124,7 @@ export default async function ProductOverviewPage({ params }: OverviewPageProps)
     notFound();
   }
 
-  const [kpis, workItems, recentDecisions, recentWorkItems, recentSignals, recentPages, recentComments, productEntityLinks, recentEntityLinks] = await Promise.all([
+  const [kpis, outcomes, workItems, recentDecisions, recentWorkItems, recentSignals, recentPages, recentComments, productEntityLinks, recentEntityLinks] = await Promise.all([
     prisma.workItem.findMany({
       where: {
         product_id: productId,
@@ -96,6 +144,44 @@ export default async function ProductOverviewPage({ params }: OverviewPageProps)
         },
       },
       orderBy: { created_at: "asc" },
+    }),
+    prisma.outcome.findMany({
+      where: {
+        journey_step: {
+          journey: {
+            product_id: productId,
+          },
+        },
+      },
+      orderBy: [
+        {
+          journey_step: {
+            journey: {
+              title: "asc",
+            },
+          },
+        },
+        {
+          journey_step: {
+            step_order: "asc",
+          },
+        },
+        { title: "asc" },
+      ],
+      select: {
+        id: true,
+        title: true,
+        journey_step: {
+          select: {
+            title: true,
+            journey: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        },
+      },
     }),
     prisma.workItem.findMany({
       where: { product_id: productId },
@@ -136,6 +222,7 @@ export default async function ProductOverviewPage({ params }: OverviewPageProps)
   ]);
 
   const tree = buildWorkItemTree(workItems);
+  const deliveryHierarchy = buildDeliveryHierarchy(outcomes, workItems);
   const latestEntityLinks = recentEntityLinks.slice(0, 5);
 
   const recentActivity = [
@@ -204,6 +291,17 @@ export default async function ProductOverviewPage({ params }: OverviewPageProps)
 
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="text-lg font-semibold text-slate-900">Delivery Hierarchy</h2>
+          <p className="mt-2 text-sm text-slate-600">Customer Outcomes anchor Features, with Stories and Tasks decomposed underneath in the delivery chain.</p>
+          <div className="mt-3">{renderDeliveryHierarchy(productId, deliveryHierarchy.outcomes)}</div>
+          {deliveryHierarchy.unlinkedFeatures.length > 0 ? (
+            <p className="mt-3 text-xs text-amber-700">
+              {deliveryHierarchy.unlinkedFeatures.length} Feature{deliveryHierarchy.unlinkedFeatures.length === 1 ? "" : "s"} still exist without an Outcome link.
+            </p>
+          ) : null}
+        </article>
+
+        <article className="rounded-xl border border-slate-200 bg-white p-4">
           <h2 className="text-lg font-semibold text-slate-900">KPI Summary</h2>
           {kpis.length === 0 ? (
             <p className="mt-2 text-sm text-slate-500">No KPIs linked yet.</p>
@@ -257,6 +355,12 @@ export default async function ProductOverviewPage({ params }: OverviewPageProps)
           )}
         </article>
       </section>
+
+      <article className="rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="text-lg font-semibold text-slate-900">WorkItem Graph</h2>
+        <p className="mt-2 text-sm text-slate-600">This is the broader WorkItem structure across capabilities, KPI chains, decisions, and other graph nodes.</p>
+        <div className="mt-3">{renderTree(tree)}</div>
+      </article>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="rounded-xl border border-slate-200 bg-white p-4">
@@ -321,10 +425,6 @@ export default async function ProductOverviewPage({ params }: OverviewPageProps)
         )}
       </article>
 
-      <article className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="text-lg font-semibold text-slate-900">Golden Thread View</h2>
-        <div className="mt-3">{renderTree(tree)}</div>
-      </article>
     </section>
   );
 }

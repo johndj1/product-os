@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getEntityLinkOptionsForProduct, getGroupedEntityLinksForProduct } from "@/lib/entity-links";
 import { prisma } from "@/lib/prisma";
-import { buildWorkItemTree, groupByType, WorkItemTreeNode } from "@/lib/product-workspace";
+import { buildDeliveryHierarchy, buildWorkItemTree, DeliveryOutcomeNode, groupByType, WorkItemTreeNode } from "@/lib/product-workspace";
 import { calculatePriorityForProduct, WorkItemPriority } from "@/lib/priority-scoring";
 import { getRelationshipsForProduct, groupRelationshipsByWorkItem, RELATIONSHIP_TYPE_VALUES } from "@/lib/relationships";
 import { WORK_ITEM_STATUS_VALUES, WorkItemTypeValue } from "@/lib/work-item-rules";
@@ -57,6 +57,63 @@ function statusBadgeClass(status: string): string {
 function typeBadgeClass(type: string): string {
   if (type === "decision") return "bg-indigo-100 text-indigo-700";
   return "bg-slate-100 text-slate-600";
+}
+
+function renderDeliveryChildren(productId: string, nodes: WorkItemTreeNode[]) {
+  if (nodes.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="mt-3 space-y-2 border-l border-slate-200 pl-3">
+      {nodes.map((node) => (
+        <li key={node.id} className="rounded-md border border-slate-100 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Link href={`/products/${productId}/work/${node.id}`} className="font-medium text-slate-900 hover:underline">
+              {node.title}
+            </Link>
+            <div className="flex items-center gap-2">
+              <span className={`rounded px-2 py-0.5 text-xs uppercase tracking-wide ${typeBadgeClass(node.type)}`}>{node.type}</span>
+              <span className={`rounded px-2 py-0.5 text-xs uppercase tracking-wide ${statusBadgeClass(node.status)}`}>{node.status}</span>
+            </div>
+          </div>
+          {renderDeliveryChildren(productId, node.children)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function renderDeliveryHierarchy(productId: string, outcomeNodes: DeliveryOutcomeNode[]) {
+  if (outcomeNodes.length === 0) {
+    return <p className="text-sm text-slate-500">No customer Outcomes found for this Product yet.</p>;
+  }
+
+  return (
+    <ul className="space-y-3">
+      {outcomeNodes.map((outcome) => (
+        <li key={outcome.id} className="rounded-md border border-slate-100 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Outcome anchor</p>
+              <p className="mt-1 font-medium text-slate-900">{outcome.title}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Journey: {outcome.journeyTitle} / Step: {outcome.journeyStepTitle}
+              </p>
+            </div>
+            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-600">
+              {outcome.features.length} feature{outcome.features.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          {outcome.features.length === 0 ? (
+            <p className="mt-3 text-sm text-slate-500">No delivery Feature linked to this Outcome yet.</p>
+          ) : (
+            renderDeliveryChildren(productId, outcome.features)
+          )}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function renderTree(
@@ -250,6 +307,7 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
   }));
 
   const { outgoingByWorkItem, incomingByWorkItem } = groupRelationshipsByWorkItem(relationships);
+  const deliveryHierarchy = buildDeliveryHierarchy(outcomes, workItems);
   const priorities = calculatePriorityForProduct(workItems, relationships, signals);
   const priorityByWorkItemId = Object.fromEntries(priorities.map((priority) => [priority.workItemId, priority])) as Record<string, WorkItemPriority>;
   const workItemById = new Map(workItems.map((item) => [item.id, item]));
@@ -267,7 +325,9 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
     <section className="grid gap-4">
       <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold text-slate-900">Work</h2>
-        <p className="mt-2 text-sm text-slate-600">Browse, link, and create WorkItems for {product.name}.</p>
+        <p className="mt-2 text-sm text-slate-600">
+          Browse and create WorkItems for {product.name}. Customer Outcomes anchor delivery Features, with Stories and Tasks decomposed beneath them.
+        </p>
       </article>
 
       {errorMessage ? <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p> : null}
@@ -453,7 +513,61 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
       </article>
 
       <article className="rounded-xl border border-slate-200 bg-white p-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Hierarchy</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Delivery Hierarchy</h3>
+        <p className="mt-2 text-sm text-slate-600">Customer Outcomes act as delivery anchors here. Features link to Outcomes, then decompose into Stories and Tasks.</p>
+        <div className="mt-3">{renderDeliveryHierarchy(productId, deliveryHierarchy.outcomes)}</div>
+        {deliveryHierarchy.unlinkedFeatures.length > 0 ? (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <p className="text-sm font-medium text-amber-900">Features missing an Outcome anchor</p>
+            <p className="mt-1 text-xs text-amber-800">Older or manually seeded Features can still exist without `outcome_id`. New Feature creation already links to a customer Outcome.</p>
+            <ul className="mt-2 space-y-2">
+              {deliveryHierarchy.unlinkedFeatures.map((feature) => (
+                <li key={feature.id}>
+                  <Link href={`/products/${productId}/work/${feature.id}`} className="text-sm font-medium text-amber-900 underline">
+                    {feature.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {deliveryHierarchy.orphanStories.length > 0 || deliveryHierarchy.orphanTasks.length > 0 ? (
+          <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+            <p className="text-sm font-medium text-slate-900">Delivery items outside the usual chain</p>
+            <p className="mt-1 text-xs text-slate-600">These items remain visible for lightweight compatibility while the model is being reorganised.</p>
+            {deliveryHierarchy.orphanStories.length > 0 ? (
+              <p className="mt-2 text-xs text-slate-700">
+                Stories:{" "}
+                {deliveryHierarchy.orphanStories.map((story, index) => (
+                  <span key={story.id}>
+                    {index > 0 ? ", " : ""}
+                    <Link href={`/products/${productId}/work/${story.id}`} className="underline">
+                      {story.title}
+                    </Link>
+                  </span>
+                ))}
+              </p>
+            ) : null}
+            {deliveryHierarchy.orphanTasks.length > 0 ? (
+              <p className="mt-2 text-xs text-slate-700">
+                Tasks:{" "}
+                {deliveryHierarchy.orphanTasks.map((task, index) => (
+                  <span key={task.id}>
+                    {index > 0 ? ", " : ""}
+                    <Link href={`/products/${productId}/work/${task.id}`} className="underline">
+                      {task.title}
+                    </Link>
+                  </span>
+                ))}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </article>
+
+      <article className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">WorkItem Graph</h3>
+        <p className="mt-2 text-sm text-slate-600">This view shows the raw WorkItem parent-child graph, including capabilities, decisions, and other non-delivery structures.</p>
         <div className="mt-3">{renderTree(productId, tree, outgoingByWorkItem, incomingByWorkItem, priorityByWorkItemId)}</div>
       </article>
     </section>

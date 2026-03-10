@@ -34,6 +34,8 @@ Important implementation detail:
 
 - `feature` WorkItems must reference `outcome_id`
 - downstream `story` and `task` items trace through the existing WorkItem hierarchy
+- the UI should present this as an outcome-anchored delivery chain: `Outcome -> Feature -> Story -> Task`
+- broader WorkItem structures such as `capability`, `kpi`, and `decision` still remain visible in the general WorkItem graph
 
 ## Technology Stack
 

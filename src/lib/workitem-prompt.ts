@@ -14,6 +14,13 @@ type GenerateWorkItemPromptInput = {
   parent?: PromptWorkItem | null;
   grandparent?: PromptWorkItem | null;
   children?: PromptWorkItem[];
+  deliveryContext?: {
+    journey?: string;
+    journeyStep?: string;
+    outcome?: string;
+    feature?: string;
+    story?: string;
+  } | null;
 };
 
 type ParsedDescription = {
@@ -137,12 +144,14 @@ export function generateCodexPrompt(input: GenerateWorkItemPromptInput): string 
   const parentDetails = parseStructuredDescription(input.parent?.description);
   const grandparentDetails = parseStructuredDescription(input.grandparent?.description);
   const featureTitle =
-    input.workItem.type === "story"
+    input.deliveryContext?.feature ??
+    (input.workItem.type === "story"
       ? input.parent?.title
       : input.workItem.type === "task"
         ? input.grandparent?.title
-        : undefined;
-  const storyTitle = input.workItem.type === "task" ? input.parent?.title : input.workItem.type === "story" ? input.workItem.title : undefined;
+        : undefined);
+  const storyTitle =
+    input.deliveryContext?.story ?? (input.workItem.type === "task" ? input.parent?.title : input.workItem.type === "story" ? input.workItem.title : undefined);
   const featureContext = [
     featureTitle ? `Feature: ${featureTitle}` : null,
     grandparentDetails.summary ? `Feature summary: ${grandparentDetails.summary}` : null,
@@ -157,8 +166,10 @@ export function generateCodexPrompt(input: GenerateWorkItemPromptInput): string 
       ? `Implement ${input.workItem.title} in the current Product OS codebase.`
       : `Implement the story outcome for ${input.workItem.title} without drifting from the intended customer outcome.`);
   const persona = workItemDetails.persona ?? parentDetails.persona ?? grandparentDetails.persona;
-  const journeyStep = workItemDetails.journeyStep ?? parentDetails.journeyStep ?? grandparentDetails.journeyStep;
-  const userOutcome = workItemDetails.desiredOutcome ?? workItemDetails.userOutcome ?? parentDetails.desiredOutcome ?? parentDetails.userOutcome;
+  const journeyStep = workItemDetails.journeyStep ?? parentDetails.journeyStep ?? grandparentDetails.journeyStep ?? input.deliveryContext?.journeyStep;
+  const journey = input.deliveryContext?.journey;
+  const userOutcome =
+    workItemDetails.desiredOutcome ?? workItemDetails.userOutcome ?? parentDetails.desiredOutcome ?? parentDetails.userOutcome ?? input.deliveryContext?.outcome;
   const technicalNotes = [
     ...(workItemDetails.implementationNotes ?? []),
     ...(workItemDetails.technicalNotes ?? []),
@@ -202,6 +213,10 @@ export function generateCodexPrompt(input: GenerateWorkItemPromptInput): string 
 
   if (journeyStep) {
     promptSections.push("", "Customer journey step:", journeyStep);
+  }
+
+  if (journey) {
+    promptSections.push("", "Journey:", journey);
   }
 
   if (userOutcome) {

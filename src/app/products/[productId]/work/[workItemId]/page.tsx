@@ -149,6 +149,21 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
           type: true,
           status: true,
           description: true,
+          outcome: {
+            select: {
+              title: true,
+              journey_step: {
+                select: {
+                  title: true,
+                  journey: {
+                    select: {
+                      title: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
           parent: {
             select: {
               id: true,
@@ -156,6 +171,21 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
               type: true,
               status: true,
               description: true,
+              outcome: {
+                select: {
+                  title: true,
+                  journey_step: {
+                    select: {
+                      title: true,
+                      journey: {
+                        select: {
+                          title: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -306,6 +336,56 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
   const reusedSignalCount = workItem.signals.filter((signal) => signal.routing_note?.includes("existing active")).length;
   const usagePatternSignals = workItem.signals.filter((signal) => asObject(signal.payload)?.usagePattern);
   const storyChildren = workItem.children.filter((child) => child.type === "story");
+  const featureContext =
+    workItem.type === "feature"
+      ? {
+          id: workItem.id,
+          title: workItem.title,
+          status: workItem.status,
+          outcome: workItem.outcome,
+        }
+      : workItem.type === "story" && workItem.parent?.type === "feature"
+        ? {
+            id: workItem.parent.id,
+            title: workItem.parent.title,
+            status: workItem.parent.status,
+            outcome: workItem.parent.outcome,
+          }
+        : workItem.type === "task" && workItem.parent?.parent?.type === "feature"
+          ? {
+              id: workItem.parent.parent.id,
+              title: workItem.parent.parent.title,
+              status: workItem.parent.parent.status,
+              outcome: workItem.parent.parent.outcome,
+            }
+          : null;
+  const storyContext =
+    workItem.type === "task" && workItem.parent?.type === "story"
+      ? {
+          id: workItem.parent.id,
+          title: workItem.parent.title,
+          status: workItem.parent.status,
+        }
+      : workItem.type === "story"
+        ? {
+            id: workItem.id,
+            title: workItem.title,
+            status: workItem.status,
+          }
+        : null;
+  const deliveryOutcome = featureContext?.outcome ?? null;
+  const deliveryContext = deliveryOutcome
+    ? {
+        journey: deliveryOutcome.journey_step.journey.title,
+        journeyStep: deliveryOutcome.journey_step.title,
+        outcome: deliveryOutcome.title,
+        feature: featureContext?.title,
+        story: storyContext?.title,
+      }
+    : {
+        feature: featureContext?.title,
+        story: storyContext?.title,
+      };
   const childPromptItems = childBuilderChildren.map((child) => ({
     id: child.id,
     title: child.title,
@@ -332,6 +412,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
             acceptanceCriteria: null,
           }
         : null,
+      deliveryContext,
     }),
   }));
   const codexPrompt = generateCodexPrompt({
@@ -364,6 +445,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
       description: null,
       acceptanceCriteria: null,
     })),
+    deliveryContext,
   });
   const canGenerateContent = (workItem.type === "story" || workItem.type === "task") && !workItem.acceptance_criteria;
   const canGeneratePrompt = workItem.type === "story" || workItem.type === "task";
@@ -442,11 +524,12 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
 
       {workItem.type === "feature" ? (
         <article className="rounded-xl border border-slate-200 bg-white p-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Linked Outcome</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Delivery Context</h3>
+          <p className="mt-2 text-sm text-slate-600">This Feature is the delivery bridge from customer Outcome to executable Stories and Tasks.</p>
           {workItem.outcome ? (
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <div className="mt-3 grid gap-3 sm:grid-cols-4">
               <div className="rounded-md border border-slate-100 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Outcome</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Delivery Anchor</p>
                 <p className="mt-1 text-sm text-slate-900">{workItem.outcome.title}</p>
               </div>
               <div className="rounded-md border border-slate-100 p-3">
@@ -457,6 +540,10 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Journey</p>
                 <p className="mt-1 text-sm text-slate-900">{workItem.outcome.journey_step.journey.title}</p>
               </div>
+              <div className="rounded-md border border-slate-100 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Child Flow</p>
+                <p className="mt-1 text-sm text-slate-900">Feature → Story → Task</p>
+              </div>
             </div>
           ) : (
             <p className="mt-2 text-sm text-rose-700">This Feature has no linked Outcome. Linkage is required for newly created Features.</p>
@@ -464,10 +551,51 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
         </article>
       ) : null}
 
+      {(workItem.type === "story" || workItem.type === "task") && (
+        <article className="rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Delivery Chain</h3>
+          <p className="mt-2 text-sm text-slate-600">This {workItem.type} stays in the delivery chain through its parent WorkItems and the linked Feature Outcome.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {storyContext && workItem.type === "task" ? (
+              <Link href={`/products/${productId}/work/${storyContext.id}`} className="rounded-md border border-slate-100 p-3 hover:bg-slate-50">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Story</p>
+                <p className="mt-1 text-sm text-slate-900">{storyContext.title}</p>
+                <p className="mt-1 text-xs text-slate-500">{storyContext.status}</p>
+              </Link>
+            ) : null}
+            {featureContext ? (
+              <Link href={`/products/${productId}/work/${featureContext.id}`} className="rounded-md border border-slate-100 p-3 hover:bg-slate-50">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Feature</p>
+                <p className="mt-1 text-sm text-slate-900">{featureContext.title}</p>
+                <p className="mt-1 text-xs text-slate-500">{featureContext.status}</p>
+              </Link>
+            ) : null}
+            {deliveryOutcome ? (
+              <>
+                <div className="rounded-md border border-slate-100 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Outcome</p>
+                  <p className="mt-1 text-sm text-slate-900">{deliveryOutcome.title}</p>
+                </div>
+                <div className="rounded-md border border-slate-100 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Journey Step</p>
+                  <p className="mt-1 text-sm text-slate-900">{deliveryOutcome.journey_step.title}</p>
+                </div>
+                <div className="rounded-md border border-slate-100 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Journey</p>
+                  <p className="mt-1 text-sm text-slate-900">{deliveryOutcome.journey_step.journey.title}</p>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-rose-700">No linked Outcome was found through the parent Feature yet.</p>
+            )}
+          </div>
+        </article>
+      )}
+
       {workItem.type === "feature" ? (
         <article className="rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Feature Decomposition</h3>
-          <p className="mt-2 text-sm text-slate-600">Generate a first-pass Story and Task breakdown that the builder can review and adjust before handing Tasks to Codex.</p>
+          <p className="mt-2 text-sm text-slate-600">Generate a first-pass Story and Task breakdown beneath this outcome-linked Feature before handing implementation to Codex.</p>
           {storyChildren.length > 0 ? (
             <p className="mt-3 text-sm text-slate-700">
               This Feature already has {storyChildren.length} Story child{storyChildren.length === 1 ? "" : "ren"}, so automatic decomposition is locked to avoid duplicate work.
@@ -542,7 +670,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
       {canGeneratePrompt ? (
         <article className="rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Codex Handoff Prompt</h3>
-          <p className="mt-2 text-sm text-slate-600">Generate a Codex-ready implementation prompt from this {workItem.type} and its hierarchy context.</p>
+          <p className="mt-2 text-sm text-slate-600">Generate a Codex-ready implementation prompt from this {workItem.type}, its parent chain, and its linked delivery Outcome.</p>
           <CodexPromptPanel prompt={codexPrompt} />
         </article>
       ) : null}
@@ -586,7 +714,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
 
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="rounded-xl border border-slate-200 bg-white p-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Parent</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Parent WorkItem</h3>
           {workItem.parent ? (
             <Link href={`/products/${productId}/work/${workItem.parent.id}`} className="mt-2 block rounded-md border border-slate-100 p-3 hover:bg-slate-50">
               <p className="font-medium text-slate-900">{workItem.parent.title}</p>
@@ -595,7 +723,10 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
               </p>
             </Link>
           ) : (
-            <p className="mt-2 text-sm text-slate-500">No parent WorkItem.</p>
+            <p className="mt-2 text-sm text-slate-500">
+              No parent WorkItem.
+              {workItem.type === "feature" && workItem.outcome ? " This Feature is still anchored by its linked Outcome." : ""}
+            </p>
           )}
         </article>
 

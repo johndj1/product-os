@@ -13,6 +13,8 @@ First usable Product workspace shell for an AI-native Product OS using Next.js, 
 ## Documentation
 
 - Platform documentation (system, architecture, decisions, operations): [`docs/platform`](docs/platform)
+- Canonical grounding rules for coding agents: [`GROUNDING_RULES.md`](GROUNDING_RULES.md)
+- Standard outcome-validation prompt pattern: [`OUTCOME_VALIDATION.md`](OUTCOME_VALIDATION.md)
 - Reusable product-model templates and guidance: [`docs/product-model`](docs/product-model)
 - Worked product example using Product OS: [`docs/product-examples/product-os`](docs/product-examples/product-os)
 - Documentation index: [`docs/README.md`](docs/README.md)
@@ -152,6 +154,7 @@ Product OS enforces the customer-to-delivery chain:
 
 All new delivery work should trace back to a customer `Outcome` derived from a `Journey Step`.
 `feature` WorkItems must point at an `Outcome` using `outcome_id`, and outcome selection now enforces that outcome-driven hierarchy during Feature creation. Downstream `story` and `task` WorkItems remain linked through the existing parent-child WorkItem hierarchy.
+The UI now surfaces that chain explicitly as `Outcome -> Feature -> Story -> Task`, while still keeping the broader WorkItem graph visible for capabilities, KPI chains, decisions, and other supporting structures.
 
 Outcome Gap Detection uses that model to find journey outcomes with no supporting `feature` WorkItems and recommend the next feature title to add.
 
