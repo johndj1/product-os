@@ -79,6 +79,7 @@ For non-trivial work, form a brief plan:
 1. define the behavior to preserve
 2. identify the smallest implementation path
 3. identify the verification needed before completion
+4. when generated delivery work is involved, confirm the Feature or Story still satisfies the canonical template sections and remains outcome-linked
 
 ## Prefer Small, Explicit Changes
 

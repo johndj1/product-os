@@ -29,6 +29,7 @@ This hierarchy is the core reasoning model of the system. If a change weakens tr
 - `Outcome`: the user value that should be achieved at a journey step.
 - `WorkItem`: the main execution and planning record. Delivery work is expressed through WorkItems such as `feature`, `story`, and `task`.
 - `Outcome Gap Detection`: logic that finds customer outcomes with no supporting `feature` WorkItems and suggests the next feature to create.
+- Generated `feature` and `story` work should follow canonical templates so the output is detailed, traceable, and ready for execution.
 
 Important implementation detail:
 
@@ -59,7 +60,7 @@ Important implementation detail:
   - `products/[productId]/work/create/route.ts`: enforces Feature-to-Outcome linkage on creation.
   - `products/[productId]/page.tsx`: Product overview and WorkItem tree rendering.
   - `api/signals/ingest/route.ts`: signal ingestion entry point.
-- `docs/`: architecture, product model, decisions, examples, and operational context.
+- `docs/`: architecture, product model, decisions, examples, operational context, and canonical generated-work templates.
 
 ## Typical Development Flow
 

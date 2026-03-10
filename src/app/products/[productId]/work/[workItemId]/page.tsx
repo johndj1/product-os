@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { getRelationshipsForProduct } from "@/lib/relationships";
 import { asObject } from "@/lib/signals";
 import { generateCodexPrompt } from "@/lib/workitem-prompt";
+import { getGeneratedWorkItemQualityGaps } from "@/lib/workitem-templates";
 import BackButton from "./back-button";
 import Breadcrumbs from "./breadcrumbs";
 import ChildBuilderPanel from "./child-builder-panel";
@@ -27,6 +28,7 @@ const detailMessages: Record<string, string> = {
   feature_decomposition_created: "Suggested Stories and Tasks created for this Feature.",
   feature_decomposition_invalid: "Feature decomposition is only available once per Feature and requires a Feature WorkItem.",
   workitem_content_generated: "Acceptance criteria and structured WorkItem content generated.",
+  workitem_generation_invalid: "Generated WorkItem content did not meet the required template sections.",
   workitem_updated: "WorkItem details updated.",
 };
 
@@ -131,6 +133,16 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
               journey: {
                 select: {
                   title: true,
+                  persona_journeys: {
+                    take: 1,
+                    select: {
+                      persona: {
+                        select: {
+                          name: true,
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -158,6 +170,16 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
                   journey: {
                     select: {
                       title: true,
+                      persona_journeys: {
+                        take: 1,
+                        select: {
+                          persona: {
+                            select: {
+                              name: true,
+                            },
+                          },
+                        },
+                      },
                     },
                   },
                 },
@@ -180,6 +202,16 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
                       journey: {
                         select: {
                           title: true,
+                          persona_journeys: {
+                            take: 1,
+                            select: {
+                              persona: {
+                                select: {
+                                  name: true,
+                                },
+                              },
+                            },
+                          },
                         },
                       },
                     },
@@ -379,6 +411,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
         journey: deliveryOutcome.journey_step.journey.title,
         journeyStep: deliveryOutcome.journey_step.title,
         outcome: deliveryOutcome.title,
+        persona: deliveryOutcome.journey_step.journey.persona_journeys[0]?.persona.name,
         feature: featureContext?.title,
         story: storyContext?.title,
       }
@@ -386,6 +419,7 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
         feature: featureContext?.title,
         story: storyContext?.title,
       };
+  const generationGaps = getGeneratedWorkItemQualityGaps(workItem.type, workItem.description, workItem.acceptance_criteria);
   const childPromptItems = childBuilderChildren.map((child) => ({
     id: child.id,
     title: child.title,
@@ -447,7 +481,8 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
     })),
     deliveryContext,
   });
-  const canGenerateContent = (workItem.type === "story" || workItem.type === "task") && !workItem.acceptance_criteria;
+  const canGenerateContent =
+    workItem.type === "feature" || workItem.type === "story" ? generationGaps.length > 0 : workItem.type === "task" && !workItem.acceptance_criteria;
   const canGeneratePrompt = workItem.type === "story" || workItem.type === "task";
   const canPrepareChildren = childBuilderChildren.length > 0;
   const now = new Date();
@@ -622,13 +657,25 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
 
       <article className="rounded-xl border border-slate-200 bg-white p-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Acceptance Criteria</h3>
+        {(workItem.type === "feature" || workItem.type === "story") && generationGaps.length > 0 ? (
+          <div className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
+            <p className="text-sm text-slate-600">
+              This {workItem.type} is missing canonical template sections: {generationGaps.join(", ")}.
+            </p>
+            <form action={`/products/${productId}/work/${workItem.id}/generate`} method="post" className="mt-3">
+              <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+                Generate Canonical Template
+              </button>
+            </form>
+          </div>
+        ) : null}
         {!workItem.acceptance_criteria ? (
           <div className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
             <p className="text-sm text-slate-600">No acceptance criteria defined for this WorkItem.</p>
             {canGenerateContent ? (
               <form action={`/products/${productId}/work/${workItem.id}/generate`} method="post" className="mt-3">
                 <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
-                  Generate Acceptance Criteria
+                  {workItem.type === "feature" || workItem.type === "story" ? "Generate Canonical Template" : "Generate Acceptance Criteria"}
                 </button>
               </form>
             ) : null}

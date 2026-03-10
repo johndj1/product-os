@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import { createFeatureDecompositionWorkItems, FeatureDecompositionError } from "@/lib/feature-decomposition-work-items";
 import { prisma } from "@/lib/prisma";
 import { assertAllowedChildType } from "@/lib/work-item-hierarchy";
+import { generateWorkItemContent } from "@/lib/workitem-criteria";
 import { WORK_ITEM_STATUS_VALUES, WORK_ITEM_TYPE_VALUES } from "@/lib/work-item-rules";
+import { GeneratedWorkItemValidationError } from "@/lib/workitem-templates";
 
 type RouteContext = {
   params: Promise<{ productId: string }>;
@@ -38,6 +40,18 @@ export async function POST(request: Request, context: RouteContext) {
   const status = (statusRaw || "new") as WorkItemStatus;
   let parentId: string | undefined;
   let outcomeId: string | undefined;
+  let featureOutcomeContext:
+    | {
+        id: string;
+        title: string;
+        journey_step: {
+          title: string;
+          journey: {
+            title: string;
+          };
+        };
+      }
+    | undefined;
 
   if (parentIdRaw) {
     const parent = await prisma.workItem.findFirst({
@@ -72,7 +86,20 @@ export async function POST(request: Request, context: RouteContext) {
           },
         },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        title: true,
+        journey_step: {
+          select: {
+            title: true,
+            journey: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!outcome) {
@@ -80,15 +107,32 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     outcomeId = outcome.id;
+    featureOutcomeContext = outcome;
   }
 
   try {
     await prisma.$transaction(async (tx) => {
+      const generatedFeatureContent =
+        type === "feature"
+          ? generateWorkItemContent({
+              type,
+              title,
+              description,
+              deliveryContext: featureOutcomeContext
+                ? {
+                    journey: featureOutcomeContext.journey_step.journey.title,
+                    journeyStep: featureOutcomeContext.journey_step.title,
+                    outcome: featureOutcomeContext.title,
+                  }
+                : null,
+            })
+          : null;
+
       const createdWorkItem = await tx.workItem.create({
         data: {
           title,
-          description: description || null,
-          acceptance_criteria: acceptanceCriteria || null,
+          description: description || generatedFeatureContent?.description || null,
+          acceptance_criteria: acceptanceCriteria || generatedFeatureContent?.acceptanceCriteria || null,
           type,
           status,
           parent_id: parentId,
@@ -104,12 +148,27 @@ export async function POST(request: Request, context: RouteContext) {
           description: createdWorkItem.description,
           product_id: createdWorkItem.product_id,
           type: createdWorkItem.type,
+          outcome: featureOutcomeContext
+            ? {
+                title: featureOutcomeContext.title,
+                journey_step: {
+                  title: featureOutcomeContext.journey_step.title,
+                  journey: {
+                    title: featureOutcomeContext.journey_step.journey.title,
+                  },
+                },
+              }
+            : null,
         });
       }
     });
   } catch (error) {
     if (error instanceof FeatureDecompositionError) {
       return NextResponse.redirect(new URL(`/products/${productId}/work?error=feature_decomposition_invalid`, request.url));
+    }
+
+    if (error instanceof GeneratedWorkItemValidationError) {
+      return NextResponse.redirect(new URL(`/products/${productId}/work?error=workitem_generation_invalid`, request.url));
     }
 
     throw error;

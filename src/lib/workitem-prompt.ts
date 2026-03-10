@@ -15,6 +15,7 @@ type GenerateWorkItemPromptInput = {
   grandparent?: PromptWorkItem | null;
   children?: PromptWorkItem[];
   deliveryContext?: {
+    persona?: string;
     journey?: string;
     journeyStep?: string;
     outcome?: string;
@@ -25,13 +26,23 @@ type GenerateWorkItemPromptInput = {
 
 type ParsedDescription = {
   summary?: string;
+  linkedOutcome?: string;
   persona?: string;
+  journey?: string;
   journeyStep?: string;
   desiredOutcome?: string;
   userOutcome?: string;
+  contextBackground?: string;
+  problemNeed?: string;
+  scopeOfWork?: string[];
+  operationalReadiness?: string[];
+  definitionOfDone?: string[];
+  dependencies?: string[];
+  value?: string;
   implementationNotes?: string[];
   objective?: string;
   deliverable?: string;
+  deliverables?: string[];
   technicalNotes?: string[];
 };
 
@@ -64,8 +75,23 @@ function parseStructuredDescription(description?: string | null): ParsedDescript
       continue;
     }
 
+    if (firstLine.startsWith("Summary:")) {
+      parsed.summary = content || firstLine.replace("Summary:", "").trim();
+      continue;
+    }
+
+    if (firstLine.startsWith("Linked Outcome:")) {
+      parsed.linkedOutcome = content || firstLine.replace("Linked Outcome:", "").trim();
+      continue;
+    }
+
     if (firstLine.startsWith("Persona:")) {
       parsed.persona = firstLine.replace("Persona:", "").trim();
+      continue;
+    }
+
+    if (firstLine.startsWith("Journey:")) {
+      parsed.journey = firstLine.replace("Journey:", "").trim();
       continue;
     }
 
@@ -84,8 +110,43 @@ function parseStructuredDescription(description?: string | null): ParsedDescript
       continue;
     }
 
+    if (firstLine.startsWith("Value:")) {
+      parsed.value = content || firstLine.replace("Value:", "").trim();
+      continue;
+    }
+
     if (firstLine.startsWith("User outcome:")) {
       parsed.userOutcome = firstLine.replace("User outcome:", "").trim();
+      continue;
+    }
+
+    if (firstLine.startsWith("Context / Background:")) {
+      parsed.contextBackground = content;
+      continue;
+    }
+
+    if (firstLine.startsWith("Problem / Need:")) {
+      parsed.problemNeed = content;
+      continue;
+    }
+
+    if (firstLine === "Scope of Work:") {
+      parsed.scopeOfWork = parseBullets(content);
+      continue;
+    }
+
+    if (firstLine === "Operational Readiness:") {
+      parsed.operationalReadiness = parseBullets(content);
+      continue;
+    }
+
+    if (firstLine === "Definition of Done:") {
+      parsed.definitionOfDone = parseBullets(content);
+      continue;
+    }
+
+    if (firstLine === "Dependencies:") {
+      parsed.dependencies = parseBullets(content);
       continue;
     }
 
@@ -104,6 +165,11 @@ function parseStructuredDescription(description?: string | null): ParsedDescript
       continue;
     }
 
+    if (firstLine === "Deliverables:") {
+      parsed.deliverables = parseBullets(content);
+      continue;
+    }
+
     if (firstLine === "Technical notes:") {
       parsed.technicalNotes = parseBullets(content);
     }
@@ -116,15 +182,70 @@ function toBullets(lines: string[]): string {
   return lines.map((line) => `- ${line}`).join("\n");
 }
 
+function buildDomainKeywords(input: GenerateWorkItemPromptInput, parsed: ParsedDescription[]): string[] {
+  const source = [
+    input.productName,
+    input.workItem.title,
+    input.workItem.description ?? "",
+    input.parent?.title ?? "",
+    input.parent?.description ?? "",
+    input.grandparent?.title ?? "",
+    input.deliveryContext?.persona ?? "",
+    input.deliveryContext?.journey ?? "",
+    input.deliveryContext?.journeyStep ?? "",
+    input.deliveryContext?.outcome ?? "",
+    ...parsed.flatMap((item) => [
+      item.summary ?? "",
+      item.problemNeed ?? "",
+      item.contextBackground ?? "",
+      item.value ?? "",
+      ...(item.scopeOfWork ?? []),
+      ...(item.dependencies ?? []),
+      ...(item.deliverables ?? []),
+    ]),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  const keywordMap: Array<[string, string[]]> = [
+    ["darwin", ["darwin"]],
+    ["delay repay", ["delay repay"]],
+    ["delay status", ["delay status", "delay", "running data"]],
+    ["operator claim", ["operator", "claim", "handoff", "redirect"]],
+    ["eligibility", ["eligibility", "qualif"]],
+    ["provider integration", ["provider", "api", "integration"]],
+    ["service data", ["service", "journey data", "payload"]],
+    ["observability", ["signal", "alert", "metric", "observability", "logging"]],
+    ["reliability", ["retry", "fallback", "failure", "degraded"]],
+  ];
+
+  const detected = keywordMap.filter(([, patterns]) => patterns.some((pattern) => source.includes(pattern))).map(([label]) => label);
+
+  if (detected.length > 0) {
+    return detected;
+  }
+
+  const stopwords = new Set(["product", "feature", "story", "task", "user", "journey", "outcome", "system", "work", "item", "productos", "product", "codebase"]);
+  return [...new Set(source.match(/[a-z][a-z0-9-]{3,}/g) ?? [])].filter((token) => !stopwords.has(token)).slice(0, 6);
+}
+
 function buildRequirements(input: GenerateWorkItemPromptInput): string {
   const criteria =
     input.workItem.acceptanceCriteria && normalizeWhitespace(input.workItem.acceptanceCriteria)
-      ? parseBullets(normalizeWhitespace(input.workItem.acceptanceCriteria))
-      : parseBullets(
+      ? normalizeWhitespace(input.workItem.acceptanceCriteria)
+      : normalizeWhitespace(
           generateAcceptanceCriteria({
             type: input.workItem.type,
             title: input.workItem.title,
             description: input.workItem.description,
+            deliveryContext: input.deliveryContext
+              ? {
+                  persona: input.deliveryContext.persona,
+                  journey: input.deliveryContext.journey,
+                  journeyStep: input.deliveryContext.journeyStep,
+                  outcome: input.deliveryContext.outcome,
+                }
+              : null,
             parent: input.parent
               ? {
                   type: input.parent.type,
@@ -136,13 +257,18 @@ function buildRequirements(input: GenerateWorkItemPromptInput): string {
           }) ?? "",
         );
 
-  return criteria.length === 0 ? "- Define the observable requirements before implementation." : toBullets(criteria);
+  if (!criteria) {
+    return "- Define the observable requirements before implementation.";
+  }
+
+  return /\bGiven\b/.test(criteria) && /\bWhen\b/.test(criteria) && /\bThen\b/.test(criteria) ? criteria : toBullets(parseBullets(criteria));
 }
 
 export function generateCodexPrompt(input: GenerateWorkItemPromptInput): string {
   const workItemDetails = parseStructuredDescription(input.workItem.description);
   const parentDetails = parseStructuredDescription(input.parent?.description);
   const grandparentDetails = parseStructuredDescription(input.grandparent?.description);
+  const domainKeywords = buildDomainKeywords(input, [workItemDetails, parentDetails, grandparentDetails]);
   const featureTitle =
     input.deliveryContext?.feature ??
     (input.workItem.type === "story"
@@ -165,12 +291,22 @@ export function generateCodexPrompt(input: GenerateWorkItemPromptInput): string 
     (input.workItem.type === "task"
       ? `Implement ${input.workItem.title} in the current Product OS codebase.`
       : `Implement the story outcome for ${input.workItem.title} without drifting from the intended customer outcome.`);
-  const persona = workItemDetails.persona ?? parentDetails.persona ?? grandparentDetails.persona;
+  const persona = input.deliveryContext?.persona ?? workItemDetails.persona ?? parentDetails.persona ?? grandparentDetails.persona;
   const journeyStep = workItemDetails.journeyStep ?? parentDetails.journeyStep ?? grandparentDetails.journeyStep ?? input.deliveryContext?.journeyStep;
-  const journey = input.deliveryContext?.journey;
+  const journey = workItemDetails.journey ?? parentDetails.journey ?? grandparentDetails.journey ?? input.deliveryContext?.journey;
   const userOutcome =
-    workItemDetails.desiredOutcome ?? workItemDetails.userOutcome ?? parentDetails.desiredOutcome ?? parentDetails.userOutcome ?? input.deliveryContext?.outcome;
+    workItemDetails.desiredOutcome ??
+    workItemDetails.linkedOutcome ??
+    workItemDetails.userOutcome ??
+    parentDetails.desiredOutcome ??
+    parentDetails.linkedOutcome ??
+    parentDetails.userOutcome ??
+    input.deliveryContext?.outcome;
   const technicalNotes = [
+    ...(workItemDetails.scopeOfWork ?? []),
+    ...(workItemDetails.operationalReadiness ?? []),
+    ...(workItemDetails.definitionOfDone ?? []),
+    ...(workItemDetails.dependencies ?? []),
     ...(workItemDetails.implementationNotes ?? []),
     ...(workItemDetails.technicalNotes ?? []),
   ];
@@ -187,6 +323,10 @@ export function generateCodexPrompt(input: GenerateWorkItemPromptInput): string 
 
   const promptSections = [
     `Implement ${input.workItem.title}.`,
+    "",
+    "Working mode:",
+    "- Behave as a combined Lead Product Owner, Lead Engineer, and Agile Delivery Lead.",
+    "- Preserve customer outcome alignment, implementation realism, and delivery traceability.",
     "",
     "Context:",
     `Product: ${input.productName}`,
@@ -223,9 +363,24 @@ export function generateCodexPrompt(input: GenerateWorkItemPromptInput): string 
     promptSections.push("", "Desired user outcome:", userOutcome);
   }
 
-  const deliverable = workItemDetails.deliverable;
-  if (deliverable) {
-    promptSections.push("", "Deliverable:", deliverable);
+  if (domainKeywords.length > 0) {
+    promptSections.push("", "Domain keywords:", toBullets(domainKeywords));
+  }
+
+  if (workItemDetails.problemNeed) {
+    promptSections.push("", "Problem / need:", workItemDetails.problemNeed);
+  }
+
+  if (workItemDetails.contextBackground) {
+    promptSections.push("", "Context / background:", workItemDetails.contextBackground);
+  }
+
+  const deliverables = [
+    ...(workItemDetails.deliverables ?? []),
+    ...(workItemDetails.deliverable ? [workItemDetails.deliverable] : []),
+  ];
+  if (deliverables.length > 0) {
+    promptSections.push("", "Deliverables:", toBullets(deliverables));
   }
 
   promptSections.push("", "Acceptance criteria:", buildRequirements(input));

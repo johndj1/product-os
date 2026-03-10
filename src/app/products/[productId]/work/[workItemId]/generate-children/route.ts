@@ -19,6 +19,21 @@ export async function POST(request: Request, context: RouteContext) {
       title: true,
       type: true,
       description: true,
+      outcome: {
+        select: {
+          title: true,
+          journey_step: {
+            select: {
+              title: true,
+              journey: {
+                select: {
+                  title: true,
+                },
+              },
+            },
+          },
+        },
+      },
       parent: {
         select: {
           id: true,
@@ -50,14 +65,21 @@ export async function POST(request: Request, context: RouteContext) {
     .filter((child) => !child.acceptance_criteria)
     .map((child) => ({
       id: child.id,
-      acceptanceCriteria: generateAcceptanceCriteria({
-        type: child.type,
-        title: child.title,
-        description: child.description,
-        parent: {
-          type: workItem.type,
-          title: workItem.title,
-          description: workItem.description,
+        acceptanceCriteria: generateAcceptanceCriteria({
+          type: child.type,
+          title: child.title,
+          description: child.description,
+          deliveryContext: workItem.outcome
+            ? {
+                journey: workItem.outcome.journey_step.journey.title,
+                journeyStep: workItem.outcome.journey_step.title,
+                outcome: workItem.outcome.title,
+              }
+            : null,
+          parent: {
+            type: workItem.type,
+            title: workItem.title,
+            description: workItem.description,
           parent: workItem.parent
             ? {
                 type: workItem.parent.type,

@@ -16,6 +16,7 @@ First usable Product workspace shell for an AI-native Product OS using Next.js, 
 - Canonical grounding rules for coding agents: [`GROUNDING_RULES.md`](GROUNDING_RULES.md)
 - Standard outcome-validation prompt pattern: [`OUTCOME_VALIDATION.md`](OUTCOME_VALIDATION.md)
 - Reusable product-model templates and guidance: [`docs/product-model`](docs/product-model)
+- Canonical Feature and Story generation templates: [`docs/workitem-templates`](docs/workitem-templates)
 - Worked product example using Product OS: [`docs/product-examples/product-os`](docs/product-examples/product-os)
 - Documentation index: [`docs/README.md`](docs/README.md)
 
@@ -72,6 +73,7 @@ Open `http://localhost:3000`.
 - Journey-derived delivery work is anchored by `Outcome`, and every new `feature` WorkItem must reference `outcome_id`.
 - KPI measurement fields live on `WorkItem` when `type = kpi` (`current_value`, `target_value`, `unit`, `last_updated_at`).
 - Acceptance Criteria live on each `WorkItem` as `acceptance_criteria`.
+- Generated `feature` and `story` content now follows canonical templates with quality checks so generated work is more traceable and execution-ready.
 - Priority scoring fields live on `WorkItem` as `priority_score` and `priority_reason`.
 - Definition of Done lives on `Product` as `definition_of_done`.
 

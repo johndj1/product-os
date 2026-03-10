@@ -6,6 +6,7 @@ import { buildDeliveryHierarchy, buildWorkItemTree, DeliveryOutcomeNode, groupBy
 import { calculatePriorityForProduct, WorkItemPriority } from "@/lib/priority-scoring";
 import { getRelationshipsForProduct, groupRelationshipsByWorkItem, RELATIONSHIP_TYPE_VALUES } from "@/lib/relationships";
 import { WORK_ITEM_STATUS_VALUES, WorkItemTypeValue } from "@/lib/work-item-rules";
+import { getGeneratedWorkItemQualityGaps } from "@/lib/workitem-templates";
 import DecisionCreateForm from "./decision-create-form";
 import EntityLinkCreateForm from "./entity-link-create-form";
 import WorkItemCreateForm from "./work-item-create-form";
@@ -14,7 +15,13 @@ export const dynamic = "force-dynamic";
 
 type WorkPageProps = {
   params: Promise<{ productId: string }>;
-  searchParams: Promise<{ error?: string; success?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    success?: string;
+    skipped_compliant?: string;
+    upgraded_features?: string;
+    upgraded_stories?: string;
+  }>;
 };
 
 const workMessages: Record<string, string> = {
@@ -30,6 +37,8 @@ const workMessages: Record<string, string> = {
   workitem_parent_type_invalid: "Selected parent is not allowed for this WorkItem type.",
   workitem_feature_outcome_required: "Features must be linked to an Outcome.",
   workitem_feature_outcome_invalid: "Selected Outcome was not found for this Product.",
+  workitem_generation_invalid: "Generated WorkItem content did not meet the required template sections.",
+  workitem_bulk_content_generated: "Legacy Features and Stories upgraded to the canonical template where needed.",
   feature_decomposition_invalid: "Feature decomposition is only available once per Feature and requires a Feature WorkItem.",
   relationship_workitems_required: "From and To WorkItems are required.",
   relationship_workitems_invalid: "Selected WorkItems must belong to this Product.",
@@ -312,6 +321,18 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
   const priorityByWorkItemId = Object.fromEntries(priorities.map((priority) => [priority.workItemId, priority])) as Record<string, WorkItemPriority>;
   const workItemById = new Map(workItems.map((item) => [item.id, item]));
   const recentEntityLinks = entityLinkData.links.slice(0, 6);
+  const canonicalUpgradeCandidates = workItems.filter((item) => {
+    if (item.type !== "feature" && item.type !== "story") {
+      return false;
+    }
+
+    return getGeneratedWorkItemQualityGaps(item.type, item.description, item.acceptance_criteria).length > 0;
+  });
+  const eligibleFeatures = canonicalUpgradeCandidates.filter((item) => item.type === "feature").length;
+  const eligibleStories = canonicalUpgradeCandidates.filter((item) => item.type === "story").length;
+  const upgradedFeatures = Number.parseInt(query.upgraded_features ?? "", 10);
+  const upgradedStories = Number.parseInt(query.upgraded_stories ?? "", 10);
+  const skippedCompliant = Number.parseInt(query.skipped_compliant ?? "", 10);
   const recommendedNextWork = priorities
     .map((priority) => ({ priority, workItem: workItemById.get(priority.workItemId) }))
     .filter((entry): entry is { priority: WorkItemPriority; workItem: (typeof workItems)[number] } => Boolean(entry.workItem))
@@ -319,7 +340,18 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
     .slice(0, 5);
 
   const errorMessage = query.error ? workMessages[query.error] ?? "Could not update WorkItem." : null;
-  const successMessage = query.success ? workMessages[query.success] ?? "Saved." : null;
+  const successMessage =
+    query.success === "workitem_bulk_content_generated"
+      ? `${workMessages.workitem_bulk_content_generated} Upgraded ${
+          Number.isFinite(upgradedFeatures) ? upgradedFeatures : 0
+        } Feature${upgradedFeatures === 1 ? "" : "s"}, ${
+          Number.isFinite(upgradedStories) ? upgradedStories : 0
+        } Stor${upgradedStories === 1 ? "y" : "ies"}, skipped ${
+          Number.isFinite(skippedCompliant) ? skippedCompliant : 0
+        } already-compliant item${skippedCompliant === 1 ? "" : "s"}.`
+      : query.success
+        ? workMessages[query.success] ?? "Saved."
+        : null;
 
   return (
     <section className="grid gap-4">
@@ -338,6 +370,26 @@ export default async function ProductWorkPage({ params, searchParams }: WorkPage
         <div className="mt-3">
           <WorkItemCreateForm productId={productId} parentOptions={parentOptions} outcomeOptions={outcomeOptions} />
         </div>
+      </article>
+
+      <article className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Bulk Canonical Upgrade</h3>
+        <p className="mt-2 text-sm text-slate-600">
+          Upgrade legacy Features and Stories that are still missing canonical template sections. Items that already meet the canonical standard are left unchanged.
+        </p>
+        <p className="mt-2 text-xs text-slate-500">
+          Eligible right now: {eligibleFeatures} Feature{eligibleFeatures === 1 ? "" : "s"} and {eligibleStories} Stor
+          {eligibleStories === 1 ? "y" : "ies"}.
+        </p>
+        <form action={`/products/${productId}/work/bulk-generate`} method="post" className="mt-3">
+          <button
+            type="submit"
+            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            disabled={canonicalUpgradeCandidates.length === 0}
+          >
+            Upgrade Legacy Features and Stories
+          </button>
+        </form>
       </article>
 
       <article className="rounded-xl border border-slate-200 bg-white p-4">
