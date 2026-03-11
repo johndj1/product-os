@@ -17,6 +17,8 @@ That means this example should be read as both:
 - `pdd/`: Product definition
 - `personas/`: primary and supporting personas
 - `journeys/`: realistic usage journeys
+- `features/`: outcome-linked Feature specifications written in the canonical Feature template
+- `stories/`: execution-ready Story specifications written in the canonical Story template
 - `journeys/execute-work-item-end-to-end.md`: shows how prioritised work is executed, validated, completed, and fed back into Product OS
 - `journeys/respond-to-kpi-movement-and-create-follow-up-work.md`: shows how KPI movement is interpreted, converted into follow-up WorkItems or Decisions, and fed back into prioritisation
 - `personas-and-journeys-thread.md`: connects the persona set and journey set into one operating loop
