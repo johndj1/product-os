@@ -268,11 +268,11 @@ async function main() {
   });
 
   const checkATrainCoverageBug = await createWorkItem({
-    title: "Historical lookup misses services outside the current HSP candidate set",
+    title: "Investigate HSP timeout and same-day historical lookup performance",
     description:
-      "Context / Background\n- Check-a-Train now resolves supported historical services through the HSP lookup path.\n- Some historical services still fail when the correct train is not present in the current candidate set.\n- This bug captures known gaps to be addressed by the follow-on historical candidate coverage Story.\n\nRepro Steps\n1. Open a historical journey that falls through to HSP lookup.\n2. Use a service where the correct match is not included in the current candidate set.\n3. View the lookup result.\n\nExpected Result\n- A valid historical candidate is found and selected.\n\nActual Result\n- No match is returned even though a valid historical service exists.\n\nSeverity\n- Medium\n\nEnvironment\n- Check-a-Train historical lookup experience\n- Historical services resolved via HSP fallback",
+      "Context / Background\n- Product: Check-a-Train\n- Journey: Claim compensation for a delayed train\n- Journey Step: Check delay details\n- Customer Outcome: User can view accurate delay information for their train\n- Check-a-Train supports Darwin live lookup for current and upcoming journeys and HSP lookup for past-date journeys.\n- The historical path uses HSP serviceMetrics candidate search, HSP serviceDetails RID-based enrichment, first-pass delay or cancellation derivation, Delay Repay eligibility signalling, and operator claim routing.\n- Same-day historical-style searches route to HSP correctly but can fail after about 5 seconds with a timeout.\n- Graceful degradation to metrics-only results is an acceptable temporary MVP mitigation if enrichment is the failing step, but the underlying root cause still needs investigation.\n\nRepro Steps\n1. Run Case A to confirm the historical HSP path can succeed.\n2. Search from CST to SEV on 2026-03-10 at 17:25.\n3. Confirm the lookup uses darwin.hsp and returns a historical result with serviceMetrics and serviceDetails data.\n4. Run Case B to reproduce the same-day performance issue.\n5. Search from TON to SEV on 2026-03-12 at 16:00 with a 30-minute window.\n6. Observe the API and UI response after about 5 seconds.\n\nExpected Result\n- Historical lookups routed to darwin.hsp complete within the allowed timeout budget when matching HSP data exists.\n- Same-day historical-style searches return a valid result, or at minimum a clear degraded result if metrics are available but enrichment fails.\n- The user can still view reliable delay information without the system implying that no service exists when the actual issue is timeout or slow enrichment.\n\nActual Result\n- The same-day historical-style search from TON to SEV on 2026-03-12 at 16:00 fails after about 5 seconds.\n- The failure is reported as timeout behaviour on the HSP path.\n- The API returns 503 and the UI shows: Train running data is taking too long to respond. Please try again.\n\nEvidence / Observations\n- Case A, working historical search:\n  - from: CST\n  - to: SEV\n  - date: 2026-03-10\n  - time: 17:25\n  - result: source darwin.hsp, serviceMetrics succeeded, serviceDetails succeeded, actual departure and arrival returned, status derived as Cancelled\n- Case B, failing same-day historical search:\n  - from: TON\n  - to: SEV\n  - date: 2026-03-12\n  - time: 16:00\n  - window: 30\n  - result: source darwin.hsp, request fails around 5 seconds, failureClass timeout, API returns 503, UI reports train running data taking too long to respond\n- Observed logs include chosenSource darwin.hsp, historical HSP lookup failed, failureClass timeout, and technicalMessage Darwin request timed out.\n- HSP serviceMetrics works successfully via direct curl against the Rail Data gateway.\n- HSP serviceDetails enrichment works successfully for at least some routes and dates.\n- Same-day historical searches appear more brittle than non-same-day past-date searches.\n- Other rail sites can return historical-like results, so this should be investigated rather than assuming HSP slowness is the only explanation.\n\nLikely Investigation Areas\n- HSP latency for certain same-day searches or result shapes.\n- Shared timeout values being too aggressive for HSP-backed lookups.\n- Too many or poorly targeted serviceDetails enrichment calls.\n- Wrong or overly serial enrichment sequencing.\n- Same-day historical searches being inherently slower or differently shaped than earlier past-date searches.\n- Payload or query strategy issues affecting candidate retrieval.\n- Candidate matching or ranking causing unnecessary enrichment work.\n- Missing metrics-first fallback in provider orchestration.\n\nImpact\n- Users checking a recently completed trip cannot reliably confirm whether the train was delayed or cancelled.\n- Delay Repay confidence drops at a high-intent moment because the journey appears to fail rather than degrade gracefully.\n- The current failure mode obscures whether the issue is HSP latency, orchestration, timeout configuration, or enrichment strategy.\n\nEnvironment\n- Check-a-Train historical lookup experience\n- HSP fallback path via darwin.hsp\n- Same-day historical-style search: TON to SEV, 2026-03-12, 16:00, 30-minute window\n- Comparison case: CST to SEV, 2026-03-10, 17:25",
     acceptanceCriteria:
-      "- Historical services outside the current narrow candidate set can still be matched when valid HSP data exists\n- Candidate expansion does not regress the already-working HSP fallback path\n- Regression coverage exists for previously missed historical candidate scenarios",
+      "- The bug records concrete evidence for one working historical case and one failing same-day historical case\n- Investigation covers timeout configuration, HSP latency, candidate selection, and serviceDetails enrichment behaviour\n- MVP mitigation allows graceful degradation to metrics-only results when appropriate, without closing out root-cause investigation\n- Any follow-on fix preserves the already-working historical HSP path",
     type: WorkItemType.bug,
     status: WorkItemStatus.ready,
     parentId: checkATrainHistoricalCoverageStory.id,
@@ -364,8 +364,9 @@ async function main() {
 
   await prisma.signal.create({
     data: {
-      title: "Check-a-Train historical lookup misses a valid HSP candidate",
-      description: "Observed historical lookup falling through to HSP but still returning no match because the valid train was outside the current candidate set.",
+      title: "Check-a-Train same-day historical HSP lookup timed out after about 5 seconds",
+      description:
+        "Observed TON to SEV same-day historical lookup routing to darwin.hsp and failing with timeout behaviour, 503 response, and UI degraded-state messaging after about 5 seconds.",
       signal_type: SignalType.test_failure,
       status: SignalStatus.new,
       severity: "medium",
@@ -373,15 +374,16 @@ async function main() {
         source: "seed",
         product: "Check-a-Train",
         component: "historical-hsp-lookup",
-        scenario: "candidate-coverage-gap",
+        scenario: "same-day-timeout-investigation",
         lookupPath: "hsp-fallback",
-        result: "no-match",
-        expectedResult: "historical-candidate-found",
+        journeyTiming: "same-day-past",
+        result: "timeout-503-ui-retry-message",
+        expectedResult: "historical-result-or-metrics-only-fallback",
       },
       product_id: product.id,
       work_item_id: checkATrainCoverageBug.id,
       reporter_id: systemUser.id,
-      routing_note: "Seeded historical candidate coverage gap for the active Check-a-Train Feature.",
+      routing_note: "Seeded same-day historical HSP timeout investigation beneath the active historical candidate coverage Story.",
     },
   });
 
