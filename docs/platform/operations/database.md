@@ -19,7 +19,7 @@ Seeding creates Product `Product OS` with:
 
 - Outcome and KPI chain
 - Capability/Feature/Story/Task examples
-- Feature/Story/Task/Bug example for Check-a-Train delay status work
+- Feature/Story/Task/Bug example for the active Check-a-Train historical HSP lookup work
 - Relationship examples
 - Seed Signals and Comment
 - KPI baseline values for "Reduce time from idea to deployed change"

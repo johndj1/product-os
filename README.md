@@ -146,8 +146,8 @@ Hierarchy vs relationships:
 - Acceptance Criteria on selected WorkItems (`Create Product overview page`, `Render golden-thread tree view`, `Signal ingestion foundation`)
 - Capability, Feature, Story, Task chain for delivery traceability
 - Bug as first-class delivery work beneath a Story
-- Seeded Check-a-Train delay-status Feature and Story with sibling Task and Bug work
-- Seeded first real Check-a-Train bug (`Delay calculation incorrect for small delays`) and linked `test_failure` Signal
+- Seeded the active Check-a-Train historical lookup Feature with a delivered Story for the working HSP fallback path
+- Seeded a follow-on Check-a-Train Story, Task, Bug, and linked `test_failure` Signal for expanding historical candidate coverage
 - Seeded page, signal, and comment for workspace visibility
 
 ## Routes
