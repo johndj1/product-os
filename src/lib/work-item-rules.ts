@@ -22,7 +22,7 @@ export const ALLOWED_CHILDREN_BY_PARENT: Partial<Record<WorkItemTypeValue, WorkI
   outcome: ["kpi"],
   capability: ["feature"],
   feature: ["story"],
-  story: ["task"],
+  story: ["task", "bug"],
 };
 
 export function isAllowedChildTypeValue(parentType: WorkItemTypeValue, childType: WorkItemTypeValue): boolean {

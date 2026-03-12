@@ -198,7 +198,12 @@ export default async function WorkItemDetailPage({ params, searchParams }: WorkI
           <span className="rounded bg-slate-100 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-600">{workItem.type}</span>
           <span className={`rounded px-2 py-0.5 text-xs uppercase tracking-wide ${statusBadgeClass(workItem.status)}`}>{workItem.status}</span>
         </div>
-        {workItem.description ? <p className="mt-2 text-sm text-slate-600">{workItem.description}</p> : <p className="mt-2 text-sm text-slate-500">No description provided.</p>}
+        <h3 className="mt-4 text-sm font-semibold uppercase tracking-wide text-slate-700">{workItem.type === "bug" ? "Bug Details" : "Description"}</h3>
+        {workItem.description ? (
+          <pre className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{workItem.description}</pre>
+        ) : (
+          <p className="mt-2 text-sm text-slate-500">No description provided.</p>
+        )}
       </article>
 
       {workItem.type === "decision" ? (

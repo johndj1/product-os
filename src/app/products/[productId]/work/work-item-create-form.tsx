@@ -31,6 +31,16 @@ export default function WorkItemCreateForm({ productId, parentOptions }: WorkIte
     return parentOptions.filter((item) => allowedParentTypes.includes(item.type));
   }, [allowedParentTypes, parentOptions]);
 
+  const descriptionPlaceholder =
+    selectedType === "bug"
+      ? "Context / Background\n- What is broken and where?\n\nRepro Steps\n1. ...\n2. ...\n\nExpected Result\n- ...\n\nActual Result\n- ...\n\nSeverity\n- ...\n\nEnvironment\n- ..."
+      : "Short context for this WorkItem";
+
+  const acceptanceCriteriaPlaceholder =
+    selectedType === "bug"
+      ? "Define the fix conditions and any regression coverage required for this defect."
+      : "Define what must be true for this WorkItem to be considered complete.";
+
   return (
     <form action={`/products/${productId}/work/create`} method="post" className="grid gap-3">
       <div>
@@ -56,8 +66,9 @@ export default function WorkItemCreateForm({ productId, parentOptions }: WorkIte
           name="description"
           rows={3}
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
-          placeholder="Short context for this WorkItem"
+          placeholder={descriptionPlaceholder}
         />
+        {selectedType === "bug" ? <p className="mt-1 text-xs text-slate-500">Use the description to capture repro steps, expected result, actual result, severity, and environment.</p> : null}
       </div>
 
       <div>
@@ -69,7 +80,7 @@ export default function WorkItemCreateForm({ productId, parentOptions }: WorkIte
           name="acceptance_criteria"
           rows={4}
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
-          placeholder="Define what must be true for this WorkItem to be considered complete."
+          placeholder={acceptanceCriteriaPlaceholder}
         />
       </div>
 

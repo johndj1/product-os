@@ -107,6 +107,7 @@ Allowed hierarchy guardrails:
 - `capability -> feature`
 - `feature -> story`
 - `story -> task`
+- `story -> bug`
 
 Hierarchy vs relationships:
 
@@ -144,6 +145,9 @@ Hierarchy vs relationships:
 - KPI baseline values for `Reduce time from idea to deployed change` (`current_value: 14`, `target_value: 3`, `unit: days`)
 - Acceptance Criteria on selected WorkItems (`Create Product overview page`, `Render golden-thread tree view`, `Signal ingestion foundation`)
 - Capability, Feature, Story, Task chain for delivery traceability
+- Bug as first-class delivery work beneath a Story
+- Seeded Check-a-Train delay-status Feature and Story with sibling Task and Bug work
+- Seeded first real Check-a-Train bug (`Delay calculation incorrect for small delays`) and linked `test_failure` Signal
 - Seeded page, signal, and comment for workspace visibility
 
 ## Routes

@@ -23,6 +23,7 @@ Provide a Product workspace that connects product planning, delivery, and operat
 
 - Product is the context root.
 - WorkItem is the core node for strategy and delivery.
+- Bug is a first-class WorkItem type for defect correction, distinct from Task delivery work.
 - Relationship provides directional graph traceability.
 - Signal captures incoming feedback/events.
 - KPI is represented as a WorkItem type.

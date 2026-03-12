@@ -193,6 +193,45 @@ async function main() {
     createdBy: systemUser.id,
   });
 
+  const workedExampleCapability = await createWorkItem({
+    title: "Worked example delivery backlogs",
+    type: WorkItemType.capability,
+    status: WorkItemStatus.ready,
+    productId: product.id,
+    createdBy: systemUser.id,
+  });
+
+  const checkATrainDelayStatusFeature = await createWorkItem({
+    title: "Check-a-Train delay status",
+    type: WorkItemType.feature,
+    status: WorkItemStatus.in_progress,
+    acceptanceCriteria:
+      "- Delay status rules are represented in the Product OS work graph\n- Feature delivery work can include both implementation Tasks and defect Bugs\n- Delay calculation issues can be traced from signal to fix",
+    parentId: workedExampleCapability.id,
+    productId: product.id,
+    createdBy: systemUser.id,
+  });
+
+  const checkATrainDelayStatusStory = await createWorkItem({
+    title: "Show accurate delay status for small timetable slips",
+    type: WorkItemType.story,
+    status: WorkItemStatus.in_progress,
+    acceptanceCriteria:
+      "- Delay shown to users matches the minute difference between scheduled and expected departure\n- Small delays are rounded or calculated correctly\n- Delivery work under this Story can separate implementation from defect correction",
+    parentId: checkATrainDelayStatusFeature.id,
+    productId: product.id,
+    createdBy: systemUser.id,
+  });
+
+  await createWorkItem({
+    title: "Review deriveDelayAndStatus rounding for minute-boundary departures",
+    type: WorkItemType.task,
+    status: WorkItemStatus.in_progress,
+    parentId: checkATrainDelayStatusStory.id,
+    productId: product.id,
+    createdBy: systemUser.id,
+  });
+
   const signalIngestionFeature = await createWorkItem({
     title: "Signal ingestion foundation",
     type: WorkItemType.feature,
@@ -200,6 +239,19 @@ async function main() {
     acceptanceCriteria:
       "- Signals can be ingested via API and UI flow\n- Deterministic routing note is recorded on signal\n- Follow-up WorkItems are created for matching rules",
     parentId: automationCapability.id,
+    productId: product.id,
+    createdBy: systemUser.id,
+  });
+
+  const checkATrainBug = await createWorkItem({
+    title: "Delay calculation incorrect for small delays",
+    description:
+      "Context / Background\n- Check-a-Train shows an incorrect delay value for small slips between scheduled and expected departure.\n- This is defect correction against expected behaviour, not net-new delivery work.\n- Likely source is deriveDelayAndStatus or related delay derivation logic.\n\nRepro Steps\n1. Open a service with scheduled departure 22:02.\n2. Apply live expected departure 22:03.\n3. View the rendered delay status.\n\nExpected Result\n- Displayed delay is 1m.\n\nActual Result\n- Displayed delay is 2m.\n\nSeverity\n- Medium\n\nEnvironment\n- Check-a-Train departures experience\n- Example service state: scheduled 22:02, expected 22:03",
+    acceptanceCriteria:
+      "- A scheduled departure of 22:02 and expected departure of 22:03 displays 1m delay\n- Delay derivation is correct for other small one-minute slips near minute boundaries\n- Regression coverage exists for deriveDelayAndStatus or the equivalent delay derivation path",
+    type: WorkItemType.bug,
+    status: WorkItemStatus.ready,
+    parentId: checkATrainDelayStatusStory.id,
     productId: product.id,
     createdBy: systemUser.id,
   });
@@ -271,6 +323,30 @@ async function main() {
       work_item_id: signalIngestionFeature.id,
       reporter_id: systemUser.id,
       routing_note: "Seed baseline signal.",
+    },
+  });
+
+  await prisma.signal.create({
+    data: {
+      title: "Check-a-Train delay status shows 2m for a 1m slip",
+      description: "Observed service rendered a 2m delay for scheduled 22:02 and expected 22:03. Seeded as the first real Check-a-Train bug.",
+      signal_type: SignalType.test_failure,
+      status: SignalStatus.new,
+      severity: "medium",
+      payload: {
+        source: "seed",
+        product: "Check-a-Train",
+        component: "deriveDelayAndStatus",
+        scenario: "small-delay-calculation",
+        scheduledDeparture: "22:02",
+        expectedDeparture: "22:03",
+        displayedDelay: "2m",
+        expectedDelay: "1m",
+      },
+      product_id: product.id,
+      work_item_id: checkATrainBug.id,
+      reporter_id: systemUser.id,
+      routing_note: "Seeded first real Check-a-Train bug.",
     },
   });
 

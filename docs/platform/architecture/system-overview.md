@@ -22,6 +22,7 @@ Product OS is a web application that lets a Product team plan, execute, and adap
 
 - WorkItem lifecycle statuses are explicit (`new`, `ready`, `in_progress`, `blocked`, `done`, `cancelled`).
 - WorkItem hierarchy follows guardrails for allowed parent-child combinations.
+- Bugs are tracked as first-class WorkItems and can sit beneath Stories alongside Tasks.
 - Relationship edges are directional and do not modify hierarchy.
 - KPI values can be updated from `kpi_change` Signals when payload fields match a KPI WorkItem.
 - Health checks are exposed at `GET /api/health` using a direct database query.

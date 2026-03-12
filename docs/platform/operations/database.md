@@ -19,8 +19,9 @@ Seeding creates Product `Product OS` with:
 
 - Outcome and KPI chain
 - Capability/Feature/Story/Task examples
+- Feature/Story/Task/Bug example for Check-a-Train delay status work
 - Relationship examples
-- Seed Signal and Comment
+- Seed Signals and Comment
 - KPI baseline values for "Reduce time from idea to deployed change"
 
 ## Caution
