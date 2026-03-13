@@ -19,7 +19,8 @@ Seeding creates Product `Product OS` with:
 
 - Outcome and KPI chain
 - Capability/Feature/Story/Task examples
-- Feature/Story/Task/Bug example for the active Check-a-Train historical HSP lookup work
+- Separate Check-a-Train examples for baseline historical lookup, alternative candidate inspection, on-demand secondary candidate enrichment, and HSP rate-limit handling
+- The HSP rate-limit example is intentionally small and focused on graceful 429 handling for historical lookups
 - Relationship examples
 - Seed Signals and Comment
 - KPI baseline values for "Reduce time from idea to deployed change"

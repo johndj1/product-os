@@ -147,7 +147,9 @@ Hierarchy vs relationships:
 - Capability, Feature, Story, Task chain for delivery traceability
 - Bug as first-class delivery work beneath a Story
 - Seeded the active Check-a-Train historical lookup Feature with a delivered Story for the working HSP fallback path
-- Seeded a follow-on Check-a-Train Story, Task, Bug, and linked `test_failure` Signal for expanding historical candidate coverage
+- Seeded a separate Check-a-Train Feature, Story, Task, Bug, and linked `test_failure` Signal for inspecting alternative historical candidates
+- Seeded an additional small Check-a-Train Feature, Story, and Task for on-demand enrichment of secondary historical candidates
+- Seeded a small Check-a-Train Feature, Story, Task, Bug, and linked `test_failure` Signal for graceful HSP rate-limit handling
 - Seeded page, signal, and comment for workspace visibility
 
 ## Routes
