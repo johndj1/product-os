@@ -1,0 +1,119 @@
+{
+  "entries": [
+    {
+      "source": "AGENTS.md",
+      "target": "AGENTS.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/delivery-system/README.md",
+      "target": "docs/delivery-system/README.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/delivery-system/feature-delivery-system.md",
+      "target": "docs/delivery-system/feature-delivery-system.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/delivery-system/new-codex-thread-grounding-prompt.md",
+      "target": "docs/delivery-system/new-codex-thread-grounding-prompt.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/delivery-system/github-and-environment-modules.md",
+      "target": "docs/delivery-system/github-and-environment-modules.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/startup-os/templates/prd-template.md",
+      "target": "docs/startup-os/templates/prd-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/startup-os/templates/ideal-customer-profile-template.md",
+      "target": "docs/startup-os/templates/ideal-customer-profile-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/startup-os/templates/personas-template.md",
+      "target": "docs/startup-os/templates/personas-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/startup-os/templates/customer-journeys-template.md",
+      "target": "docs/startup-os/templates/customer-journeys-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/startup-os/templates/competitor-analysis-template.md",
+      "target": "docs/startup-os/templates/competitor-analysis-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/startup-os/templates/offer-creation-template.md",
+      "target": "docs/startup-os/templates/offer-creation-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/startup-os/templates/validation-strategy-template.md",
+      "target": "docs/startup-os/templates/validation-strategy-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/startup-os/templates/go-to-market-strategy-template.md",
+      "target": "docs/startup-os/templates/go-to-market-strategy-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/startup-os/templates/content-strategy-template.md",
+      "target": "docs/startup-os/templates/content-strategy-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/startup-os/templates/sales-funnel-and-projections-template.md",
+      "target": "docs/startup-os/templates/sales-funnel-and-projections-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/startup-os/templates/automation-setup-template.md",
+      "target": "docs/startup-os/templates/automation-setup-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/startup-os/templates/delivery-and-reliability-system-template.md",
+      "target": "docs/startup-os/templates/delivery-and-reliability-system-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "docs/startup-os/templates/product-sources-template.md",
+      "target": "docs/startup-os/templates/product-sources-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "tasks/templates/task-template.md",
+      "target": "tasks/templates/task-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "tasks/templates/codex-task-prompt-template.md",
+      "target": "tasks/templates/codex-task-prompt-template.md",
+      "onConflict": "sidecar"
+    },
+    {
+      "source": "tasks/backlog/.gitkeep",
+      "target": "tasks/backlog/.gitkeep",
+      "onConflict": "skip"
+    },
+    {
+      "source": "tasks/active/.gitkeep",
+      "target": "tasks/active/.gitkeep",
+      "onConflict": "skip"
+    },
+    {
+      "source": "tasks/done/.gitkeep",
+      "target": "tasks/done/.gitkeep",
+      "onConflict": "skip"
+    }
+  ]
+}
