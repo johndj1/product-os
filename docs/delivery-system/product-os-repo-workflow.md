@@ -37,6 +37,23 @@ Default loop:
 - the active task includes the standard task sections
 - the repo has enough written context to execute the task safely
 
+## Rollout Review-Loop Assets
+
+Adopted repos need these minimum assets before the Product OS task loop is executable:
+
+- `tasks/templates/task-template.md`
+- `tasks/templates/codex-task-prompt-template.md`
+- `tasks/backlog/`, `tasks/active/`, and `tasks/done/`
+- `scripts/review-active-task.mjs`
+
+The bootstrap manifest may copy these files and directories, but it does not edit a target repo's package or build configuration. For Node-capable repos, add this script entry manually:
+
+```json
+"review:active-task": "node scripts/review-active-task.mjs"
+```
+
+For repos that are not Node-first, either run `node scripts/review-active-task.mjs` directly when Node is available, or wire the equivalent task-runner command used by that repo. Adoption is incomplete until humans and agents have a documented command that executes the active-task review.
+
 ## Merge Rule
 
 - Preserve `docs/platform/` as implementation truth.

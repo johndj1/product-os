@@ -91,6 +91,11 @@
       "onConflict": "sidecar"
     },
     {
+      "source": "scripts/review-active-task.mjs",
+      "target": "scripts/review-active-task.mjs",
+      "onConflict": "sidecar"
+    },
+    {
       "source": "tasks/templates/task-template.md",
       "target": "tasks/templates/task-template.md",
       "onConflict": "sidecar"
