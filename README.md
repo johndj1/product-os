@@ -12,10 +12,13 @@ First usable Product workspace shell for an AI-native Product OS using Next.js, 
 
 ## Documentation
 
+- Product OS grounding and startup-delivery rules: [`AGENTS.md`](AGENTS.md), [`docs/product-os-grounding.md`](docs/product-os-grounding.md)
+- Documentation index and reading map: [`docs/README.md`](docs/README.md)
 - Platform documentation (system, architecture, decisions, operations): [`docs/platform`](docs/platform)
+- Startup operating model for Product OS as a product business: [`docs/startup-os`](docs/startup-os)
+- Delivery workflow and repo-operating loop: [`docs/delivery-system`](docs/delivery-system)
 - Reusable product-model templates and guidance: [`docs/product-model`](docs/product-model)
 - Worked product example using Product OS: [`docs/product-examples/product-os`](docs/product-examples/product-os)
-- Documentation index: [`docs/README.md`](docs/README.md)
 
 ## Setup
 
@@ -146,11 +149,10 @@ Hierarchy vs relationships:
 - Acceptance Criteria on selected WorkItems (`Create Product overview page`, `Render golden-thread tree view`, `Signal ingestion foundation`)
 - Capability, Feature, Story, Task chain for delivery traceability
 - Bug as first-class delivery work beneath a Story
-- Seeded the active Check-a-Train historical lookup Feature with a delivered Story for the working HSP fallback path
-- Seeded a separate Check-a-Train Feature, Story, Task, Bug, and linked `test_failure` Signal for inspecting alternative historical candidates
-- Seeded an additional small Check-a-Train Feature, Story, and Task for on-demand enrichment of secondary historical candidates
-- Seeded a small Check-a-Train Feature, Story, Task, Bug, and linked `test_failure` Signal for graceful HSP rate-limit handling
+- Additional seeded example delivery scenarios used to exercise hierarchy, relationships, and signal routing
 - Seeded page, signal, and comment for workspace visibility
+
+Current seed specifics live in [`docs/platform/operations/database.md`](docs/platform/operations/database.md) so the top-level README can stay focused on Product OS itself rather than historical sample scenarios.
 
 ## Routes
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This plan explains how Product OS can absorb the stronger repo-driven delivery and product documentation construct proven in Check-a-Train without overwriting the docs that already exist here.
+This plan explains how Product OS can absorb proven repo-driven delivery and product documentation patterns from earlier source repos without overwriting the docs that already exist here.
 
 ## Merge Strategy
 
@@ -41,9 +41,9 @@ These documents are needed to run Product OS like a startup and are currently mi
 - delivery, engineering, and SRE operating model
 - startup roadmap
 
-## Adapt From Check-a-Train
+## Adapt From Earlier Source Repos
 
-The following patterns should be adapted, not copied literally:
+The following patterns may be adapted when they are useful to Product OS, but they should not be copied literally or allowed to drag in another product's framing:
 
 - product context document pattern
 - product sources map

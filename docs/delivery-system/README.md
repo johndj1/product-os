@@ -20,6 +20,7 @@ This layer covers:
 
 ## Main Sources
 
+- `product-os-repo-workflow.md`
 - `feature-delivery-system.md`
 - `new-codex-thread-grounding-prompt.md`
 - `github-and-environment-modules.md`

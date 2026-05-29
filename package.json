@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "review:active-task": "node scripts/review-active-task.mjs",
     "bootstrap:product-repo": "node scripts/bootstrap/init-product-repo.mjs",
     "prisma:generate": "prisma generate",
     "db:push": "prisma db push",

@@ -3,6 +3,9 @@
 ## Status
 Backlog
 
+## Assignee
+codex
+
 ## Parent feature
 <Feature or startup initiative name>
 

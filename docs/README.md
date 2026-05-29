@@ -4,9 +4,10 @@ This directory is the documentation system for Product OS.
 
 ## Start Here
 
-- If you need to understand Product OS itself, start in `docs/platform`.
+- If you are opening a new Product OS implementation thread, start with `AGENTS.md`, `docs/product-os-grounding.md`, and `docs/delivery-system/new-codex-thread-grounding-prompt.md`.
+- If you need current implemented Product OS behavior, start in `docs/platform`.
 - If you need the startup operating model for Product OS as a company-building product, start in `docs/startup-os`.
-- If you need the reusable delivery and engineering operating model, start in `docs/delivery-system`.
+- If you need the repo workflow and reusable delivery model, start in `docs/delivery-system`.
 - If you need to document a new Product, start in `docs/product-model/templates`.
 - If you want a complete reference example, start in `docs/product-examples/product-os`.
 
@@ -48,10 +49,27 @@ Additive company-building documentation for Product OS itself:
 
 Reusable delivery and engineering workflow patterns:
 
+- Product OS repo workflow and branch normalization rules
 - task lifecycle and close-out rules
 - AI grounding prompt patterns
 - GitHub and environment module guidance
 - task templates for rollout into future products
+
+## Reading Order For Product OS Repo Work
+
+1. `AGENTS.md`
+2. `docs/product-os-grounding.md`
+3. `docs/startup-os/product-sources.md`
+4. `docs/delivery-system/feature-delivery-system.md`
+5. `docs/delivery-system/product-os-repo-workflow.md`
+6. the active task file in `tasks/active/` when one exists
+
+## Source Mapping Rule
+
+- `docs/platform/` is implementation truth
+- `docs/startup-os/` is startup planning and operating truth
+- `docs/delivery-system/` is the repo and exportable delivery workflow
+- if these differ, call out the difference explicitly and update one source deliberately
 
 ## Recommended Workflow For A New Product
 

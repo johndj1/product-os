@@ -22,6 +22,46 @@ function sidecarPath(targetPath) {
   return `${base}.new${ext}`;
 }
 
+function recommendedAction(status) {
+  if (status === "created") {
+    return "adopt-now";
+  }
+
+  if (status === "skipped-existing") {
+    return "unchanged";
+  }
+
+  return "review-manually";
+}
+
+function actionDescription(action) {
+  if (action === "adopt-now") {
+    return "File was added because no target file existed. Review for product-specific placeholders, then keep it as the adopted Product OS baseline.";
+  }
+
+  if (action === "unchanged") {
+    return "Target already existed and the bootstrap rule preserves it. No immediate merge is required.";
+  }
+
+  return "Manual review is required before adoption. Compare the generated sidecar or missing-source result with the target repo and merge only the Product OS guidance that fits this product.";
+}
+
+function nextStep(result) {
+  if (result.status === "created") {
+    return "Keep as the Product OS baseline unless local product context needs a follow-up edit.";
+  }
+
+  if (result.status === "skipped-existing") {
+    return "Leave unchanged; confirm the directory placeholder is still useful during normal repo cleanup.";
+  }
+
+  if (result.status === "sidecar-created") {
+    return `Compare \`${result.sidecar}\` with \`${result.target}\`, merge the needed Product OS guidance manually, then delete or retain the sidecar with an explicit decision.`;
+  }
+
+  return "Source file was not found in Product OS. Check the manifest entry before rerunning bootstrap.";
+}
+
 const targetArg = process.argv[2];
 
 if (!targetArg) {
@@ -83,6 +123,9 @@ const created = results.filter((result) => result.status === "created").length;
 const sidecars = results.filter((result) => result.status === "sidecar-created").length;
 const skipped = results.filter((result) => result.status === "skipped-existing").length;
 const missing = results.filter((result) => result.status === "missing-source").length;
+const adoptNow = results.filter((result) => recommendedAction(result.status) === "adopt-now").length;
+const reviewManually = results.filter((result) => recommendedAction(result.status) === "review-manually").length;
+const unchanged = results.filter((result) => recommendedAction(result.status) === "unchanged").length;
 
 const reportLines = [
   "# Product OS Bootstrap Report",
@@ -96,18 +139,51 @@ const reportLines = [
   `- skipped-existing: ${skipped}`,
   `- missing-source: ${missing}`,
   "",
+  "## Action Summary",
+  "",
+  `- adopt-now: ${adoptNow}`,
+  `- review-manually: ${reviewManually}`,
+  `- unchanged: ${unchanged}`,
+  "",
+  "## Action Definitions",
+  "",
+  `- adopt-now: ${actionDescription("adopt-now")}`,
+  `- review-manually: ${actionDescription("review-manually")}`,
+  `- unchanged: ${actionDescription("unchanged")}`,
+  "",
   "## File Results",
   ""
 ];
 
 for (const result of results) {
+  const action = recommendedAction(result.status);
+
   if (result.status === "sidecar-created") {
-    reportLines.push(`- ${result.status}: \`${result.target}\` -> \`${result.sidecar}\``);
+    reportLines.push(`- ${action} / ${result.status}: \`${result.target}\` -> \`${result.sidecar}\``);
+    reportLines.push(`  - next: ${nextStep(result)}`);
     continue;
   }
 
-  reportLines.push(`- ${result.status}: \`${result.target}\``);
+  reportLines.push(`- ${action} / ${result.status}: \`${result.target}\``);
+  reportLines.push(`  - next: ${nextStep(result)}`);
 }
+
+reportLines.push(
+  "",
+  "## Merge Review Checklist",
+  "",
+  "Use this checklist after bootstrap. Do not run an automated merge from this report.",
+  "",
+  "- `AGENTS.md`: preserve existing repo-specific agent rules, then manually add Product OS grounding, traceability, task workflow, and validation expectations that do not conflict with the target repo.",
+  "- `docs/delivery-system/`: adopt these as workflow guidance. If a target repo already has delivery docs, keep implemented-platform truth intact and merge Product OS task, review, and rollout rules additively.",
+  "- `docs/startup-os/templates/`: treat these as reusable templates, not product truth. Keep existing product-specific PRDs, personas, journeys, growth, finance, engineering, and operations docs separate unless a human deliberately consolidates them.",
+  "- `tasks/templates/`: use these to standardize future work items. If the target repo has task templates, merge required local fields with Product OS outcome, scope, acceptance, operational-readiness, and validation sections.",
+  "- `tasks/backlog/`, `tasks/active/`, and `tasks/done/`: keep existing task files. Directory placeholders are unchanged when the directories already exist.",
+  "",
+  "Example conflict review: if `AGENTS.new.md` exists beside `AGENTS.md`, compare the files, copy only the Product OS rules that improve traceability and delivery safety, preserve local repository constraints, then remove `AGENTS.new.md` or document why it remains.",
+  "",
+  "Manual review is complete when every `review-manually` item above has an explicit merge, defer, or discard decision."
+);
 
 const reportPath = path.join(targetRoot, "docs/product-os-bootstrap-report.md");
 ensureDir(reportPath);
