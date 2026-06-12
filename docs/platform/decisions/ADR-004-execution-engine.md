@@ -66,6 +66,10 @@ AgentRun
   work_item_id   uuid → WorkItem
   status         spawned | running | done | failed
   output_summary string?
+  model_used     string?
+  input_tokens   int?
+  output_tokens  int?
+  cost_usd       float?
   started_at     timestamp?
   completed_at   timestamp?
   created_at     timestamp
@@ -82,10 +86,21 @@ A key architectural constraint: context must be kept lean at every level.
 
 This is not optional — token consumption spirals out of control without explicit context budgets at each agent boundary.
 
+### FinOps
+
+Token costs are a first-class concern, not an afterthought. Three levers:
+
+**1. Cost observability** — `AgentRun` records `model_used`, `input_tokens`, `output_tokens`, and `cost_usd` on every run. The execution plan UI surfaces per-run and per-plan totals. A `cost_overrun` signal is emitted when a run exceeds its budget threshold.
+
+**2. Model tier strategy** — not every task needs the most capable model. The coordinator (high-level decomposition, conflict resolution) uses a strong reasoning model. Sub-agents executing a scoped story with clear acceptance criteria use a lighter model (15-20x cheaper). Model assignment is determined by WorkItem type and complexity, not hardcoded.
+
+**3. Prompt caching** — stable context fields (acceptance criteria, parent feature description, product Definition of Done) are structured to be cache-eligible. Re-sending identical prefixes on every turn of a multi-turn agent is the primary source of avoidable token spend.
+
 ## Consequences
 
 - Product OS closes the loop: work defined in Layer 1 is executed by Layer 2, and results flow back as signals.
 - The system is self-hosting: Layer 2 can execute the very WorkItems that define Layer 2 itself.
 - Merge conflicts and test failures surface as first-class signals, preserving the existing feedback model.
-- Context discipline becomes a first-class architectural concern with explicit rules per agent role.
+- Context discipline and cost management are first-class architectural concerns with explicit rules per agent role.
 - Adding `test` and `build` as WorkItem types makes tests traceable in the product graph, not a side-channel.
+- Cost per story is a measurable KPI, not invisible infrastructure spend.
